@@ -11,23 +11,20 @@ library(dplyr)
 library(tidyr)
 library(ggplot2)
 #cost sets
-paymentandvalue <- read.csv("https://github.com/anniey/Hospital-Ranking-CS107/blob/master/Raw%20Data/Payment_and_value_of_care_-_Hospital.csv") #national
-inpatientcost <- read.csv("https://github.com/anniey/Hospital-Ranking-CS107/blob/master/Raw%20Data/Hospital_Inpatient_Cost_Transparency__Beginning_2009.csv") #NYS
+paymentandvalue <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/Payment_and_value_of_care_-_Hospital.csv") #national
+inpatientcost <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/Hospital_Inpatient_Cost_Transparency__Beginning_2009.csv") #NYS
 
 #risk of badness sets
-PCIbyhosptial <- read.csv("https://github.com/anniey/Hospital-Ranking-CS107/blob/master/Raw%20Data/Cardiac_Surgery_and_Percutaneous_Coronary_Interventions_by_Hospital___Beginning_2008.csv") #NYS
-hospitalinfection <- read.csv("https://github.com/anniey/Hospital-Ranking-CS107/blob/master/Raw%20Data/Hospital-Acquired_Infections__Beginning_2008.csv") #NYS
-complicationshospital <- read.csv("https://github.com/anniey/Hospital-Ranking-CS107/blob/master/Raw%20Data/Readmissions_Complications_and_Deaths_-_Hospital.csv") #national
+PCIbyhosptial <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/Cardiac_Surgery_and_Percutaneous_Coronary_Interventions_by_Hospital___Beginning_2008.csv") #NYS
+hospitalinfection <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/Hospital-Acquired_Infections__Beginning_2008.csv") #NYS
+complicationshospital <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/Readmissions_Complications_and_Deaths_-_Hospital.csv") #national
 
-###NOTE: make change the hcahps score so it's read from the web
 #service
-hcahps <- read.csv("https://github.com/anniey/Hospital-Ranking-CS107/blob/master/Raw%20Data/hcahps.csv") #NYS
-timely <- read.csv("https://github.com/anniey/Hospital-Ranking-CS107/blob/master/Raw%20Data/Timely_and_Effective_Care_-_Hospital.csv") #national
+hcahps <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/hcahps.csv") #NYS
+timely <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/Timely_and_Effective_Care_-_Hospital.csv") #national
 
 #readmisisons
-readmission <- read.csv("https://github.com/anniey/Hospital-Ranking-CS107/blob/master/Raw%20Data/Hospital_Readmissions_Reduction_Program.csv") #national 
-
-p
+readmission <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/Hospital_Readmissions_Reduction_Program.csv") #national 
 ```
 
 ##Wrangling

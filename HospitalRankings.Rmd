@@ -11,26 +11,41 @@ library(dplyr)
 library(tidyr)
 library(ggplot2)
 #cost sets
-paymentandvalue <- read.csv("~/Documents/Harvard/CS107 Big Data/Final Project/Payment_and_value_of_care_-_Hospital.csv") #national
-inpatientcost <- read.csv("~/Documents/Harvard/CS107 Big Data/Final Project/Hospital_Inpatient_Cost_Transparency__Beginning_2009.csv") #NYS
+paymentandvalue <- read.csv("https://github.com/anniey/Hospital-Ranking-CS107/blob/master/Raw%20Data/Payment_and_value_of_care_-_Hospital.csv") #national
+inpatientcost <- read.csv("https://github.com/anniey/Hospital-Ranking-CS107/blob/master/Raw%20Data/Hospital_Inpatient_Cost_Transparency__Beginning_2009.csv") #NYS
 
 #risk of badness sets
-PCIbyhosptial <- read.csv("~/Documents/Harvard/CS107 Big Data/Final Project/Cardiac_Surgery_and_Percutaneous_Coronary_Interventions_by_Hospital___Beginning_2008.csv") #NYS
-hospitalinfection <- read.csv("~/Documents/Harvard/CS107 Big Data/Final Project/Hospital-Acquired_Infections__Beginning_2008.csv") #NYS
-complicationshospital <- read.csv("~/Documents/Harvard/CS107 Big Data/Final Project/Complications_-_Hospital.csv") #national
+PCIbyhosptial <- read.csv("https://github.com/anniey/Hospital-Ranking-CS107/blob/master/Raw%20Data/Cardiac_Surgery_and_Percutaneous_Coronary_Interventions_by_Hospital___Beginning_2008.csv") #NYS
+hospitalinfection <- read.csv("https://github.com/anniey/Hospital-Ranking-CS107/blob/master/Raw%20Data/Hospital-Acquired_Infections__Beginning_2008.csv") #NYS
+complicationshospital <- read.csv("https://github.com/anniey/Hospital-Ranking-CS107/blob/master/Raw%20Data/Readmissions_Complications_and_Deaths_-_Hospital.csv") #national
 
+###NOTE: make change the hcahps score so it's read from the web
 #service
-hcahps <- read.csv("~/Documents/Harvard/CS107 Big Data/Final Project/Patient_survey__HCAHPS__-_Hospital.csv") #national
-timely <- read.csv("~/Documents/Harvard/CS107 Big Data/Final Project/Timely_and_Effective_Care_-_Hospital.csv") #national
+#hcahps <- read.csv("~/Documents/Harvard/CS107 Big Data/Final Project/Patient_survey__HCAHPS__-_Hospital.csv") #national
+timely <- read.csv("https://github.com/anniey/Hospital-Ranking-CS107/blob/master/Raw%20Data/Timely_and_Effective_Care_-_Hospital.csv") #national
 
 #readmisisons
-readmission <- read.csv("~/Documents/Harvard/CS107 Big Data/Final Project/Hospital_Readmissions_Reduction_Program.csv") #national 
-mortality <- read.csv("~/Documents/Harvard/CS107 Big Data/Final Project/Readmissions_Complications_and_Deaths_-_Hospital.csv") #national
+readmission <- read.csv("https://github.com/anniey/Hospital-Ranking-CS107/blob/master/Raw%20Data/Hospital_Readmissions_Reduction_Program.csv") #national 
+
+p
 ```
 
 ##Wrangling
 Limit Data Sets to NYS only:
 ```{r}
-paymentandvalue <- paymentandvalue %>% filter(State=="NY")
+paymentandvalue <- paymentandvalue %>% filter(State=="NY")s
+complicationshospital <- complicationshospital %>% filter(State=="NY")
+hcahps <- hcahps %>% filter(State=="NY")
+timely <- timely %>% filter(State=="NY")
+readmission <- readmission %>% filter(State=="NY")
+mortality <- mortality %>% filter(State=="NY")
+```
+
+Cost set
+```{r}
+names(inpatientcost)[3] <- "Hospital.name"
+temp<- 
+cost <- left_join(inpatientcost, paymentandvalue)
+
 ```
 

@@ -21,7 +21,7 @@ complicationshospital <- read.csv("https://github.com/anniey/Hospital-Ranking-CS
 
 ###NOTE: make change the hcahps score so it's read from the web
 #service
-#hcahps <- read.csv("~/Documents/Harvard/CS107 Big Data/Final Project/Patient_survey__HCAHPS__-_Hospital.csv") #national
+hcahps <- read.csv("https://github.com/anniey/Hospital-Ranking-CS107/blob/master/Raw%20Data/hcahps.csv") #NYS
 timely <- read.csv("https://github.com/anniey/Hospital-Ranking-CS107/blob/master/Raw%20Data/Timely_and_Effective_Care_-_Hospital.csv") #national
 
 #readmisisons

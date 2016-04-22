@@ -1,0 +1,36 @@
+---
+title: "HospitalRankings"
+author: "Michael Zelenetz, Xiojing Yang"
+date: "April 20, 2016"
+output: html_document
+---
+
+Load data from local file:
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+#cost sets
+paymentandvalue <- read.csv("~/Documents/Harvard/CS107 Big Data/Final Project/Payment_and_value_of_care_-_Hospital.csv") #national
+inpatientcost <- read.csv("~/Documents/Harvard/CS107 Big Data/Final Project/Hospital_Inpatient_Cost_Transparency__Beginning_2009.csv") #NYS
+
+#risk of badness sets
+PCIbyhosptial <- read.csv("~/Documents/Harvard/CS107 Big Data/Final Project/Cardiac_Surgery_and_Percutaneous_Coronary_Interventions_by_Hospital___Beginning_2008.csv") #NYS
+hospitalinfection <- read.csv("~/Documents/Harvard/CS107 Big Data/Final Project/Hospital-Acquired_Infections__Beginning_2008.csv") #NYS
+complicationshospital <- read.csv("~/Documents/Harvard/CS107 Big Data/Final Project/Complications_-_Hospital.csv") #national
+
+#service
+hcahps <- read.csv("~/Documents/Harvard/CS107 Big Data/Final Project/Patient_survey__HCAHPS__-_Hospital.csv") #national
+timely <- read.csv("~/Documents/Harvard/CS107 Big Data/Final Project/Timely_and_Effective_Care_-_Hospital.csv") #national
+
+#readmisisons
+readmission <- read.csv("~/Documents/Harvard/CS107 Big Data/Final Project/Hospital_Readmissions_Reduction_Program.csv") #national 
+mortality <- read.csv("~/Documents/Harvard/CS107 Big Data/Final Project/Readmissions_Complications_and_Deaths_-_Hospital.csv") #national
+```
+
+##Wrangling
+Limit Data Sets to NYS only:
+```{r}
+paymentandvalue <- paymentandvalue %>% filter(State=="NY")
+```
+

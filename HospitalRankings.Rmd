@@ -50,7 +50,27 @@ providerID_data <- hcahps %>%
   right_join(providerID_data, by = "Provider.ID")
 
 providerID_data <- paymentandvalue %>%
-  select(c(Payment.measure.ID, Payment.measure.name, Payment.category, Denominator, Payment, Value.of.care.display.ID, Value.of.care.display.name, Value.of.care.category))
+  select(c(Provider.ID, Payment.measure.ID, Payment.measure.name, Payment.category, Denominator, Payment, Value.of.care.display.ID, Value.of.care.display.name, Value.of.care.category)) %>%
+  right_join(providerID_data, by = "Provider.ID")
+
+#next join all the datasets with facility ID (remove 2008 from hospitalinfection)
+facilityID_data <- hospitalinfection %>%
+  select(-c(Hospital.Name)) %>%
+  filter(Year > 2008) %>%
+  right_join(inpatientcost, by = c("Facility.Id", "Year"))
+
+colnames(PCIbyhospital)[1] <- "Facility.Id"
+colnames(PCIbyhospital)[6] <- "Year"
+
+temp <- PCIbyhospital %>%
+  select(-c(Detailed.Region, Region, Hospital.Name)) %>%
+  transform(Year = as.numeric(levels(Year))[Year]) %>%
+  filter(Year %in% c("2010", "2011", "2012"))
+
+facilityID_data <- facilityID_data %>%
+  filter(Year > 2009) %>%
+  left_join(temp, by = c("Facility.Id", "Year"))
+  
 
 HospitalNames <- complicationshospital$Hospital.Name %>%
   as.data.frame() %>%

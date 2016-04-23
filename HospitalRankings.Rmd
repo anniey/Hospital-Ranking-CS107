@@ -15,7 +15,7 @@ paymentandvalue <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-R
 inpatientcost <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/Hospital_Inpatient_Cost_Transparency__Beginning_2009.csv") #NYS
 
 #risk of badness sets
-PCIbyhosptial <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/Cardiac_Surgery_and_Percutaneous_Coronary_Interventions_by_Hospital___Beginning_2008.csv") #NYS
+PCIbyhospital <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/Cardiac_Surgery_and_Percutaneous_Coronary_Interventions_by_Hospital___Beginning_2008.csv") #NYS
 hospitalinfection <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/Hospital-Acquired_Infections__Beginning_2008.csv") #NYS
 complicationshospital <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/Readmissions_Complications_and_Deaths_-_Hospital.csv") #national
 
@@ -30,12 +30,71 @@ readmission <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranki
 ##Wrangling
 Limit Data Sets to NYS only:
 ```{r}
-paymentandvalue <- paymentandvalue %>% filter(State=="NY")s
+paymentandvalue <- paymentandvalue %>% filter(State=="NY")
 complicationshospital <- complicationshospital %>% filter(State=="NY")
 hcahps <- hcahps %>% filter(State=="NY")
 timely <- timely %>% filter(State=="NY")
 readmission <- readmission %>% filter(State=="NY")
-mortality <- mortality %>% filter(State=="NY")
+```
+
+Join data sets by hospital name
+```{r}
+
+#first, join the datasets with providerIDs
+providerID_data <- complicationshospital %>%
+  select(c(Provider.ID, Hospital.Name, Measure.Name, Measure.ID, Compared.to.National, Denominator, Score, Lower.Estimate, Higher.Estimate))
+
+providerID_data <- hcahps %>%
+  select(c(Provider.ID, HCAHPS.Measure.ID, HCAHPS.Question, Patient.Survey.Star.Rating, HCAHPS.Answer.Percent, HCAHPS.Linear.Mean.Value)) %>%
+  transform(Provider.ID = factor(Provider.ID)) %>%
+  right_join(providerID_data, by = "Provider.ID")
+
+providerID_data <- paymentandvalue %>%
+  select(c(Payment.measure.ID, Payment.measure.name, Payment.category, Denominator, Payment, Value.of.care.display.ID, Value.of.care.display.name, Value.of.care.category))
+
+HospitalNames <- complicationshospital$Hospital.Name %>%
+  as.data.frame() %>%
+  unique()
+
+colnames(HospitalNames) <- c("Hospital.Name")
+
+#find all non-matching hospital names
+ProblemNames <- HospitalNames %>%
+  anti_join(hcahps, by = "Hospital.Name")
+
+#clean names in hcahps
+levels(hcahps$Hospital.Name) <- c(levels(hcahps$Hospital.Name), "NY EYE AND EAR INFIRMARY", "HUDSON VALLEY HOSPITAL CENTER", "HEALTH ALLIANCE HOSPITAL MARY'S AVENUE CAMPUS")
+hcahps$Hospital.Name[hcahps$Hospital.Name == "N Y EYE AND EAR INFIRMARY"] <- "NY EYE AND EAR INFIRMARY"
+hcahps$Hospital.Name[hcahps$Hospital.Name == "NEW YORK-PRESBYTERIAN/HUDSON VALLEY HOSPITAL"] <- "HUDSON VALLEY HOSPITAL CENTER"
+hcahps$Hospital.Name[hcahps$Hospital.Name == "HEALTHALLIANCE HOSPITAL MARYS AVENUE CAMPUS"] <- "HEALTH ALLIANCE HOSPITAL MARY'S AVENUE CAMPUS"
+
+
+#repreat for paymentandvalue
+colnames(paymentandvalue)[2] <- c("Hospital.Name")
+
+ProblemNames <- HospitalNames %>%
+  anti_join(paymentandvalue, by = "Hospital.Name")
+
+#clean names in paymentandvalue
+levels(paymentandvalue$Hospital.Name) <- c(levels(paymentandvalue$Hospital.Name), "NY EYE AND EAR INFIRMARY", "HEALTH ALLIANCE HOSPITAL MARY'S AVENUE CAMPUS",  "HUDSON VALLEY HOSPITAL CENTER")
+
+paymentandvalue$Hospital.Name[paymentandvalue$Hospital.Name == "N Y EYE AND EAR INFIRMARY"] <- "NY EYE AND EAR INFIRMARY"
+paymentandvalue$Hospital.Name[paymentandvalue$Hospital.Name == "HEALTHALLIANCE HOSPITAL MARYS AVENUE CAMPUS"] <- "HEALTH ALLIANCE HOSPITAL MARY'S AVENUE CAMPUS"
+paymentandvalue$Hospital.Name[paymentandvalue$Hospital.Name == "NEW YORK-PRESBYTERIAN/HUDSON VALLEY HOSPITAL"] <- "HUDSON VALLEY HOSPITAL CENTER"
+
+
+#repeat for other charts with provider
+hospitalinfection$Hospital.Name <- toupper(hospitalinfection$Hospital.Name)
+
+ProblemNames <- HospitalNames %>%
+  anti_join(hospitalinfection, by = "Hospital.Name")
+
+#keep track of names that just need some cleaning
+CleaningNames <- as.data.frame("Hospitalinfection" = c("MERCY HOSPITAL OF BUFFALO, MERCY HOSPITAL", "ST JOHNS EPISCOPAL HOSPITAL SO SHORE, ST JOHN'S EPISCOPAL HOSPITAL AT SOUTH SHORE"))  
+
+  %>%
+  anti_join(inpatientcost, by = "Hospital.Name")
+
 ```
 
 Cost set

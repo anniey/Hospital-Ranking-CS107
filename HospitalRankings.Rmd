@@ -37,7 +37,7 @@ timely <- timely %>% filter(State=="NY")
 readmission <- readmission %>% filter(State=="NY")
 ```
 
-Join data sets by hospital name
+Combine all the datasets that use Provider ID and Facility ID, respectively
 ```{r}
 
 #first, join the datasets with providerIDs
@@ -56,17 +56,6 @@ providerID_data <- paymentandvalue %>%
 #split the coordinates from the location column. we will use it later to help ID hospitals with varying name conventions btw the provider and facility dataset
 providerID_data <- providerID_data %>%
   separate(Location, into = c("Location", "Location.1"), sep = "\\(")
-
-providerID_data$Location.1 <- gsub("\\)", "", providerID_data$Location.1)
-
-providerID_data <- providerID_data %>%
-  separate(Location.1, into = c("Location1.Long", "Location1.Lat"), sep = ",")
-
-providerID_data <- providerID_data %>%
-  transform(Location1.Long = as.numeric(Location1.Long, digits = 6))
-
-providerID_data <- providerID_data %>%
-  transform(Location1.Lat = as.numeric(Location1.Lat, digits = 6))
   
 #next join all the datasets with facility ID (remove 2008 from hospitalinfection)
 facilityID_data <- hospitalinfection %>%
@@ -86,43 +75,84 @@ facilityID_data <- facilityID_data %>%
   filter(Year > 2009) %>%
   left_join(temp, by = c("Facility.Id", "Year"))
 
-#remove parenthesis from location coordinates
-facilityID_data$Location.1 <- gsub("\\)", "", facilityID_data$Location.1)
-facilityID_data$Location.1 <- gsub("\\(", "", facilityID_data$Location.1)
-  
-#clean latitude and longitude
-facilityID_data <- facilityID_data  %>%
-  separate(Location.1, into = c("Location1.Long", "Location1.Lat"), sep = ",")
+#clean case convention and column name
+facilityID_data$Facility.Name <- toupper(facilityID_data$Facility.Name)
 
-facilityID_data  <- facilityID_data  %>%
-  transform(Location1.Long = as.numeric(Location1.Long, digits = 6))
+colnames(facilityID_data)[13] <- c("Hospital.Name")
+```
 
-facilityID_data  <- facilityID_data  %>%
-  transform(Location1.Lat = as.numeric(Location1.Lat, digits = 6))
 
+Now let's try to join the ProviderID dataset with the FacilityID dataset using the Hospital/Facility Name. First, we need to clean up some of the varying naming conventions between the two datasets. We will use ProviderID as the convention since it has the shorter list
+
+```{r}
 #find the hospital names that are slightly different between the datasets
 
-HospitalNames <- facilityID_data %>%
-  select(Facility.Name, Location1.Long, Location1.Lat) %>%
+facilityID_data$Hospital.Name <- as.character(facilityID_data$Hospital.Name)
+providerID_data$Hospital.Name <- as.character(providerID_data$Hospital.Name)
+
+FacilityNames <- facilityID_data %>%
+  select(Hospital.Name, Location.1) %>%
   as.data.frame() %>%
   unique()
 
-colnames(HospitalNames)[1] <- c("Hospital.Name")
+HospitalNames <- providerID_data %>%
+  select(Hospital.Name, Location.1) %>%
+  as.data.frame() %>%
+  unique()
 
-HospitalNames$Hospital.Name <- toupper(HospitalNames$Hospital.Name)
+#merge the tables and find where there is unmerged rows
+ProblemNames <- merge(FacilityNames, HospitalNames, by = "Hospital.Name", all = TRUE)
 
-#find all non-matching hospital names
-ProblemNames <- HospitalNames %>%
-  anti_join(providerID_data , by = "Hospital.Name")
-
-#use location to find original hospital name
-ProblemNames <- providerID_data %>%
-  select(Hospital.Name, Location1.Long, Location1.Lat) %>%
-  right_join(HospitalNames, by = "Location1.Long")
+```
 
 
+Quickly scanning the list of merged names, we notice that a common difference in convention between the datasets is the use of "INC" vs ", INC". Let's update FacilityID from "INC" to ", INC".
+```{r}
 
-#clean names in hcahps
+#Update FacilityID's uses "INC" to match ProviderID's ", INC"
+facilityID_data$Hospital.Name <- gsub(" Inc", ", Inc", facilityID_data$Hospital.Name)
+
+#rerun the merged datasets
+FacilityNames <- facilityID_data %>%
+  select(Hospital.Name, Location.1) %>%
+  as.data.frame() %>%
+  unique()
+
+#merge the tables and find where there is unmerged rows
+ProblemNames <- merge(FacilityNames, HospitalNames, by = "Hospital.Name", all = TRUE)
+
+```
+
+It also looks like the facility database has separate IDs for different divisions of a hospital provider. Let's remap all these divisions to the parent provider
+```{r}
+
+#rename Catskill to remove from further cleaning
+facilityID_data$Hospital.Name <- gsub("CATSKILL REGIONAL MEDICAL CENTER - G. HERMANN SITE", "CATSKILL REGIONAL MEDICAL CENTER G HERMANN SITE", facilityID_data$Hospital.Name)
+
+#remove division name following -
+facilityID_data$Hospital.Name <- gsub("- [A-z ]*", "", facilityID_data$Hospital.Name)
+
+#refilter uniques
+FacilityNames <- facilityID_data %>%
+  select(Hospital.Name, Location.1) %>%
+  as.data.frame()
+
+FacilityNames <- FacilityNames[!duplicated(FacilityNames[,1]),]
+
+#merge the tables and find where there is unmerged rows
+ProblemNames <- full_join(FacilityNames, HospitalNames, by = "Hospital.Name")
+
+```
+
+```{r}
+
+#create table remapping facility name to hospital name
+facility_orig = c("ADIRONDACK MEDICAL CENTER-SARANAC LAKE SITE", "BRONX-LEBANON HOSPITAL CENTER - CONCOURSE DIVISION", "BRONX-LEBANON HOSPITAL CENTER - FULTON DIVISION", "BROOKHAVEN MEMORIAL HOSPITAL MEDICAL CENTER INC", "BROOKLYN HOSPITAL CENTER AT DOWNTOWN CAMPUS", "CATSKILL REGIONAL MEDICAL CENTER - G. HERMANN SITE", "CHAMPLAIN VALLEY PHYSICIANS HOSPITAL MEDICAL CENTER", "CLIFTON-FINE HOSPITAL", "EASTERN NIAGARA HOSPITAL - LOCKPORT DIVISION")
+facility_new = c("ADIRONDACK MEDICAL CENTER", "BRONX-LEBANON HOSPITAL CENTER", "BRONX-LEBANON HOSPITAL CENTER", "BROOKHAVEN MEMORIAL HOSPITAL MEDICAL CENTER", "BROOKLYN HOSPITAL CENTER", "CATSKILL REGIONAL MEDICAL CENTER - G HERMANN SITE", "CHAMPLAIN VALLEY PHYSICIANS HOSPITAL MEDICAL CTR", "CLIFTON FINE HOSPITAL", "EASTERN NIAGARA HOSPITAL")
+
+#clean names in FacilityID
+facilityID_data$Facility.Name[facilityID_data$Facility.Name == "ADIRONDACK MEDICAL CENTER-SARANAC LAKE SITE"] <- "ADIRONDACK MEDICAL CENTER"
+
 levels(hcahps$Hospital.Name) <- c(levels(hcahps$Hospital.Name), "NY EYE AND EAR INFIRMARY", "HUDSON VALLEY HOSPITAL CENTER", "HEALTH ALLIANCE HOSPITAL MARY'S AVENUE CAMPUS")
 hcahps$Hospital.Name[hcahps$Hospital.Name == "N Y EYE AND EAR INFIRMARY"] <- "NY EYE AND EAR INFIRMARY"
 hcahps$Hospital.Name[hcahps$Hospital.Name == "NEW YORK-PRESBYTERIAN/HUDSON VALLEY HOSPITAL"] <- "HUDSON VALLEY HOSPITAL CENTER"

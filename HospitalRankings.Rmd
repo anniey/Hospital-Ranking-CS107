@@ -42,7 +42,7 @@ Join data sets by hospital name
 
 #first, join the datasets with providerIDs
 providerID_data <- complicationshospital %>%
-  select(c(Provider.ID, Hospital.Name, Measure.Name, Measure.ID, Compared.to.National, Denominator, Score, Lower.Estimate, Higher.Estimate))
+  select(c(Provider.ID, Hospital.Name, Measure.Name, Measure.ID, Compared.to.National, Denominator, Score, Lower.Estimate, Higher.Estimate, Location))
 
 providerID_data <- hcahps %>%
   select(c(Provider.ID, HCAHPS.Measure.ID, HCAHPS.Question, Patient.Survey.Star.Rating, HCAHPS.Answer.Percent, HCAHPS.Linear.Mean.Value)) %>%
@@ -52,6 +52,12 @@ providerID_data <- hcahps %>%
 providerID_data <- paymentandvalue %>%
   select(c(Provider.ID, Payment.measure.ID, Payment.measure.name, Payment.category, Denominator, Payment, Value.of.care.display.ID, Value.of.care.display.name, Value.of.care.category)) %>%
   right_join(providerID_data, by = "Provider.ID")
+
+#split the coordinates from the location column. we will use it later to help ID hospitals with varying name conventions btw the provider and facility dataset
+providerID_data
+
+k <- providerID_data %>%
+  separate(Location, into = c("Location", "Location.1"), sep = "\\(")
 
 #next join all the datasets with facility ID (remove 2008 from hospitalinfection)
 facilityID_data <- hospitalinfection %>%
@@ -71,16 +77,19 @@ facilityID_data <- facilityID_data %>%
   filter(Year > 2009) %>%
   left_join(temp, by = c("Facility.Id", "Year"))
   
+#find the hospital names that are slightly different between the datasets
 
-HospitalNames <- complicationshospital$Hospital.Name %>%
+HospitalNames <- facilityID_data$Facility.Name %>%
   as.data.frame() %>%
   unique()
 
 colnames(HospitalNames) <- c("Hospital.Name")
 
+HospitalNames$Hospital.Name <- toupper(HospitalNames$Hospital.Name)
+
 #find all non-matching hospital names
 ProblemNames <- HospitalNames %>%
-  anti_join(hcahps, by = "Hospital.Name")
+  anti_join(providerID_data, by = "Hospital.Name")
 
 #clean names in hcahps
 levels(hcahps$Hospital.Name) <- c(levels(hcahps$Hospital.Name), "NY EYE AND EAR INFIRMARY", "HUDSON VALLEY HOSPITAL CENTER", "HEALTH ALLIANCE HOSPITAL MARY'S AVENUE CAMPUS")

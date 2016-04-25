@@ -161,9 +161,13 @@ facilityID_data$Hospital.Name <- sapply(facilityID_data$Hospital.Name, function(
   ifelse(x %in% remapped_names$Facility.Name, remapped_names[facility_orig == x, 2], x)
 })
 
+
+
 ```
 
-montefiore, st joseph
+Michael's relationship exploration space
+
+Annie's data exploration space
 
 ```
 

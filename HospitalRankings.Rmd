@@ -31,10 +31,12 @@ readmission <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranki
 Limit Data Sets to NYS only:
 ```{r}
 paymentandvalue <- paymentandvalue %>% filter(State=="NY")
+paymentandvalue <- paymentandvalue %>% filter(State=="NY")
 complicationshospital <- complicationshospital %>% filter(State=="NY")
 hcahps <- hcahps %>% filter(State=="NY")
 timely <- timely %>% filter(State=="NY")
 readmission <- readmission %>% filter(State=="NY")
+mortality <- mortality %>% filter(State=="NY")
 ```
 
 Combine all the datasets that use Provider ID and Facility ID, respectively
@@ -120,7 +122,6 @@ FacilityNames <- facilityID_data %>%
 
 #merge the tables and find where there is unmerged rows
 ProblemNames <- merge(FacilityNames, HospitalNames, by = "Hospital.Name", all = TRUE)
-
 ```
 
 It also looks like the facility database has separate IDs for different divisions of a hospital provider. Let's remap all these divisions to the parent provider
@@ -167,15 +168,98 @@ facilityID_data$Hospital.Name <- sapply(facilityID_data$Hospital.Name, function(
 
 Michael's relationship exploration space
 
-Annie's data exploration space
+I expected cost to improve with the number of cases seen, does it?
+```{r}
+PN <- providerID_data %>%
+  filter(Payment.measure.ID=="PAYM_30_PN") %>%
+  select(Provider.ID, Denominator.x, Payment, Payment.measure.ID) %>%
+  na.omit(PN) %>%
+  filter(Denominator.x != "Not Available")
+PN <- PN[!duplicated(PN), ]
+ggplot(PN, aes(Denominator.x, Payment)) + geom_point()
+
+AMI <- providerID_data %>%
+  filter(Payment.measure.ID=="PAYM_30_AMI") %>%
+  select(Provider.ID, Denominator.x, Payment, Payment.measure.ID) %>%
+  na.omit(AMI) %>%
+  filter(Denominator.x != "Not Available")
+AMI <- AMI[!duplicated(AMI), ]
+ggplot(AMI, aes(Denominator.x, Payment)) + geom_point()
+
+HF <- providerID_data %>%
+  filter(Payment.measure.ID=="PAYM_30_HF") %>%
+  select(Provider.ID, Denominator.x, Payment, Payment.measure.ID) %>%
+  na.omit(HF) %>%
+  filter(Denominator.x != "Not Available")
+HF <- HF[!duplicated(HF), ]
+ggplot(HF, aes(Denominator.x, Payment)) + geom_point()
+```
+No, it does not.
+
+```{r}
+library(scales)
+PCI <- inpatientcost %>% 
+  filter(Year==2010) %>%
+  filter(APR.DRG.Description=="Heart Failure")%>%
+  filter(APR.Severity.of.Illness.Code==1)
+ggplot(PCI, aes(Discharges, Mean.Charge)) + geom_point(color=PCI$APR.Severity.of.Illness.Code) + geom_smooth(method=lm) + scale_x_continuous(trans=log2_trans())
+
+PCI <- inpatientcost %>% 
+  filter(Year==2010) %>%
+  filter(APR.DRG.Description=="Heart Failure")%>%
+  filter(APR.Severity.of.Illness.Code==2)
+ggplot(PCI, aes(Discharges, Mean.Charge)) + geom_point(color=PCI$APR.Severity.of.Illness.Code) + geom_smooth(method=lm) + scale_x_continuous(trans=log2_trans())
+
+PCI <- inpatientcost %>% 
+  filter(Year==2010) %>%
+  filter(APR.DRG.Description=="Heart Failure")%>%
+  filter(APR.Severity.of.Illness.Code==3)
+ggplot(PCI, aes(Discharges, Mean.Charge)) + geom_point(color=PCI$APR.Severity.of.Illness.Code) + geom_smooth(method=lm) + scale_x_continuous(trans=log2_trans())
+```
+Severity does not change costs, neither does number of cases. 
+
+
+```{r}
+#temp <- as.data.frame(unique(providerID_data$Provider.ID))
+#temp2 <- facilityID_data[!duplicated(facilityID_data$Hospital.Name),]
+```
+
+```{r}
+readmissionInfection <- filter(readmission, Measure.Name=="READM-30-COPD-HRRP") %>% 
+  select(Hospital.Name, Provider.Number, Number.of.Readmissions, Number.of.Discharges)
+
+#convert to correct type
+readmissionInfection[, 3] <- as.numeric(as.character( readmissionInfection[, 3] ))
+readmissionInfection[, 4] <- as.numeric(as.character( readmissionInfection[, 4] ))
+ #omit NAs
+na.omit(readmissionInfection)
+
+readmissionInfection <- mutate(readmissionInfection, readmissionRate= `Number.of.Readmissions`/`Number.of.Discharges`)
+
+#time in ED
+temp <- timely %>%
+  filter(Measure.ID=="ED_1b") #Median time from emergency department arrival to emergency department departure for admitted emergency department patients
+
+temp <- left_join(temp, readmissionInfection, by= "Hospital.Name") %>%
+  select(Hospital.Name, Measure.ID, Score, Sample, readmissionRate)
+ggplot(temp, aes(x=temp$readmissionRate, y= temp$Score)) + geom_point() + xlab("Readmission Rate") + ylab("ED Wait Times (for admitted patients)")
+```
+
+
+
+```{r}
+#THIS IS DRIVING ME CRAZY
+#Box plot Scores
+complicationshospital <- as.data.frame(complicationshospital)
+temp <- select(complicationshospital, Hospital.Name, Score, Measure.Name)
+temp <- temp$Score %>% gsub("Not Available", NA)
+```
+
+```{r}
 
 ```
 
-Cost set
-```{r}
-names(inpatientcost)[3] <- "Hospital.name"
-temp<- 
-cost <- left_join(inpatientcost, paymentandvalue)
+Annie's data exploration space
 
 ```
 

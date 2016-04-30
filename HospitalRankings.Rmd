@@ -34,7 +34,7 @@ paymentandvalue <- paymentandvalue %>% filter(State=="NY")
 paymentandvalue <- paymentandvalue %>% filter(State=="NY")
 complicationshospital <- complicationshospital %>% filter(State=="NY")
 hcahps <- hcahps %>% filter(State=="NY")
-timely <- timely %>% filter(State=="NY")
+timely <- timely %>% filtexzr(State=="NY")
 readmission <- readmission %>% filter(State=="NY")
 mortality <- mortality %>% filter(State=="NY")
 ```
@@ -255,11 +255,102 @@ temp <- select(complicationshospital, Hospital.Name, Score, Measure.Name)
 temp <- temp$Score %>% gsub("Not Available", NA)
 ```
 
+
+Annie's data exploration space
+
+The first hypothesis we will test is whether number of cases seen by a hospital impacts quality of care or cost.
 ```{r}
+
+#clean the data
+PV <- paymentandvalue %>%
+  select(Provider.ID, Denominator, Payment, Payment.measure.ID, Value.of.care.category) %>%
+  na.omit() %>%
+  filter(Denominator != "Not Available")
+
+#change payment and denominator into numeric
+PV$Payment <- sub('\\$','', as.character(levels(PV$Payment))[PV$Payment]) %>%
+  as.numeric()
+
+PV$Denominator <- sub('\\,','', as.character(levels(PV$Denominator))[PV$Denominator]) %>%
+  as.numeric()
+
+
+#plot cost and number of cases a hospital sees
+ggplot(PV, aes(Denominator, Payment)) + 
+  geom_point() +
+  facet_wrap(~Payment.measure.ID, scales = "free_x") +
+  xlab("Case count")
 
 ```
 
-Annie's data exploration space
+The number of cases does not appear to be correlated with payment. This suggests that, contrary to expectation, hospitals that see more of a case may not actually have an advantage in scalibility to reduce costs.
+
+Let's now see whether value of care, as defined by mortality and payment intersection, is impacted by the number of cases seen.
+
+```{r}
+#let's now check number of cases and value of care
+PV %>%
+  ggplot(aes(Value.of.care.category, Denominator)) +
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ylab("Number of Cases")
+
+#let's check heart disease in particular
+PV %>% filter(Payment.measure.ID == "PAYM_30_HF") %>%
+  ggplot(aes(Value.of.care.category, Denominator)) +
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ylab("Number of Cases")
+
+
+```
+
+From the boxplots, we can see that number of cases seen does not appear to vary much between average mortality and worse mortality outcomes. However, it does appear that hospitals with better mortality tend to have seen more cases.
+
+Let's focus on just mortality, ignoring the payment dimension, and observe the impact of cases there.
+
+```{r}
+
+#bucket the mortality rates, ignoring payment
+PV <- PV %>%
+  mutate(Care.Cat = ifelse(grepl("Better mortality", Value.of.care.category), "Better Mortality", 
+                           ifelse(grepl("Average mortality", Value.of.care.category), "Average Mortality", "Worse mortality")))
+
+#let's plot a boxplot of the number of cases by group
+PV %>%
+  ggplot(aes(Care.Cat, Denominator)) +
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ylab("Number of Cases") +
+  facet_wrap(~Payment.measure.ID, scales = "free_x")
+
+```
+
+In ignoring the payment categories and focusing on just average vs. better mortality, we can see that mortality does seem to be better at hospitals that observe more cases for all three types of illnesses. Let us see if there is enough 
+
+```{r}
+library(caret)
+set.seed(1)
+#turn character into numeric
+PV <- mutate(PV, Care.Cat = ifelse(grepl("Better mortality", Value.of.care.category), 3, 
+                           ifelse(grepl("Average mortality", Value.of.care.category), 2, 1)))
+
+
+#create train and test sets
+inTrain <- createDataPartition(y = PV$Care.Cat, p = 0.8)
+train_set <- slice(PV, inTrain$Resample1)
+test_set <- slice(PV, -inTrain$Resample1)
+
+#fit the data
+fit <- glm(Care.Cat ~ Denominator, data=train_set)
+pred <- predict(fit, newdata = test_set, type = "response")
+tab <- table(pred = round(pred), truth = test_set$Care.Cat)
+
+tab
+
+```
+
+From the table of results above, we can see that while there may appear to be some difference in number of cases seen between the three categories of mortality, the difference is not great enough for number of cases to be used as a predictor of mortality. That being said, the small size of the dataset may also be at play here.
 
 ```
 

@@ -10,6 +10,8 @@ Load data from local file:
 library(dplyr)
 library(tidyr)
 library(ggplot2)
+library(broom)
+library(knitr)
 #cost sets
 paymentandvalue <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/Payment_and_value_of_care_-_Hospital.csv") #national
 inpatientcost <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/Hospital_Inpatient_Cost_Transparency__Beginning_2009.csv") #NYS
@@ -370,27 +372,47 @@ CH %>%
   geom_smooth()
 ```
 
-We see that it appears like mortality rates decrease with higher number of cases for heart failure
+It looks like there is a slightly increase in mortality rate when the number of cases increase, but then it drops off as the number of cases continue to grow. Let's now explore additional measures such as mortality rate for AMI and Strokes.
 
 ```{r}
-#let's look at the relationship for HF only
+#let's look at the relationship for AMI and STK
 CH %>%
-  filter(Measure.ID %in% c("MORT_30_HF", "MORT_30_AMI")) %>%
-  ggplot(aes(Denominator, Score), colour = factor(Measure.ID)) +
+  filter(Measure.ID %in% c("MORT_30_HF", "MORT_30_AMI", "MORT_30_STK")) %>%
+  ggplot(aes(Denominator, Score, colour = Measure.ID)) +
   geom_point() +
   geom_smooth() 
 
 ```
 
-Let's see what happens when we try to fit a regression
+The drop in mortality rate is even more pronounced for AMI.
+
+Let's see what happens when we try to fit a regression to number of cases and mortality rate of AMI and HF.
+
 ```{r}
-library(broom)
-res <- CH %>%
+
+CH_HF <- CH %>%
+  filter(Measure.ID == "MORT_30_HF") %>%
+  na.omit()
+  
+CH_AMI <- CH %>%
+  filter(Measure.ID == "MORT_30_AMI") %>%
+  na.omit()
+
+res_HF <- CH %>%
+  filter(Measure.ID %in% c("MORT_30_HF")) %>%
   lm(Score ~ Denominator, data = .) %>%
-  tidy()
+  tidy(conf.int = TRUE)
+
+res_AMI <- CH %>%
+  filter(Measure.ID %in% c("MORT_30_AMI")) %>%
+  lm(Score ~ Denominator, data = .) %>%
+  tidy(conf.int = TRUE)
+
+kable(res_HF)
+kable(res_AMI)
 ```
 
-Looks like regression is a good way to predict mortality score
+From the above, we can see that with each additional case of HF, a hospital's rate of mortality decreases between 0.01% to 0.02%. For AMI, the rate of decrease is even higher at 0.01% to 0.04%.
 
 Now, let us move on to examining severity's relationship with cost and number of cases
 

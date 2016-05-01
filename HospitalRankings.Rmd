@@ -22,7 +22,7 @@ hospitalinfection <- read.csv("https://raw.githubusercontent.com/anniey/Hospital
 complicationshospital <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/Readmissions_Complications_and_Deaths_-_Hospital.csv") #national
 
 #service
-hcahps <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/hcahps.csv") #NYS
+hcahps <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/hcahps.csv") #national
 timely <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/Timely_and_Effective_Care_-_Hospital.csv") #national
 
 #readmisisons
@@ -33,10 +33,9 @@ readmission <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranki
 Limit Data Sets to NYS only:
 ```{r}
 paymentandvalue <- paymentandvalue %>% filter(State=="NY")
-paymentandvalue <- paymentandvalue %>% filter(State=="NY")
 complicationshospital <- complicationshospital %>% filter(State=="NY")
 hcahps <- hcahps %>% filter(State=="NY")
-timely <- timely %>% filtexzr(State=="NY")
+timely <- timely %>% filter(State=="NY")
 readmission <- readmission %>% filter(State=="NY")
 mortality <- mortality %>% filter(State=="NY")
 ```
@@ -260,7 +259,149 @@ temp <- temp$Score %>% gsub("Not Available", NA)
 
 Annie's data exploration space
 
-The first hypothesis we will test is whether number of cases seen by a hospital impacts quality of care or cost.
+
+The purpose of this project is to examine the Hospital Consumer Assessment of Healthcare Providers and Systems (HCAHPS) and related medical metrics that capture patient's overall experience at a hospital. 
+
+As part of the Affordable Care Act, the government issued the creation of a national, standardized, publicly reported survey of patients' perspectives of hospital care (i.e. the HCAHPS). The HCAHPS contains numerous qualitative measures of a patient's experience including cleanliness of the hospital, pain management, effective communication by doctors and nurses, etc. The most visible and highly focused on these metrics are the star ratings.
+
+Our project will create a predictive model of star ratings for NY hospitals. First, we will look at other metrics within HCAHPS that can be leveraged within our model. Then, we will explore other hospital/Medicare databases and see whether metrics such as cost, mortality rates, infection rates, readmission rates, and waiting times are also predictive of star ratings.
+
+Part 1: Examinig HCAHPS
+
+```{r}
+#spread the ratings and the other scores
+HCAHPS_sum <- hcahps %>%
+  select(Provider.ID, HCAHPS.Measure.ID, Patient.Survey.Star.Rating) %>%
+  filter(HCAHPS.Measure.ID == "H_STAR_RATING") %>%
+  spread(HCAHPS.Measure.ID, Patient.Survey.Star.Rating)
+
+HCAHPS_sum <- hcahps %>%
+  select(Provider.ID, HCAHPS.Measure.ID, HCAHPS.Linear.Mean.Value) %>%
+  filter(HCAHPS.Measure.ID %in% c("H_CLEAN_LINEAR_SCORE", "H_COMP_1_LINEAR_SCORE", "H_COMP_2_LINEAR_SCORE","H_COMP_3_LINEAR_SCORE", "H_COMP_4_LINEAR_SCORE","H_COMP_5_LINEAR_SCORE", "H_COMP_6_LINEAR_SCORE","H_COMP_7_LINEAR_SCORE","H_HSP_RATING_LINEAR_SCORE", "H_QUIET_LINEAR_SCORE")) %>%
+  right_join(HCAHPS_sum, by = "Provider.ID")
+
+HCAHPS_sum[HCAHPS_sum == "Not Available"] = NA
+HCAHPS_sum <- na.omit(HCAHPS_sum)
+
+HCAHPS_sum$HCAHPS.Linear.Mean.Value <- as.numeric(as.character(HCAHPS_sum$HCAHPS.Linear.Mean.Value))
+
+#refactor star rating to account for removed factors
+HCAHPS_sum$H_STAR_RATING <- factor(HCAHPS_sum$H_STAR_RATING)
+
+```
+
+Let's plot these scores and see if there is any relationship to star rating.
+
+```{r}
+HCAHPS_sum %>%
+  ggplot(aes(H_STAR_RATING, HCAHPS.Linear.Mean.Value)) +
+  geom_boxplot()
+
+```
+
+A quick look at the aggregated scores against star ratings boxplot shows a weak positive relationship between the scores and the star rating. Now, let's see which of the scores are most predictive of a hospitals star rating.
+
+```{r}
+#find the distance between the scores and star rating
+HCAHPS_sum <- HCAHPS_sum %>%
+  spread(HCAHPS.Measure.ID, HCAHPS.Linear.Mean.Value) %>%
+  select(-c(Provider.ID))
+
+HCAHPS_dist <- as.matrix(HCAHPS_sum) %>%
+  t() %>%
+  dist()
+
+heatmap(as.matrix(HCAHPS_dist), margins = c(15,15))
+```
+
+From the heatmap above, it looks like 
+
+```{r}
+#knn
+set.seed(1)
+control <- trainControl(method='cv', number=10, p=.8)
+res_knn <- train(H_STAR_RATING ~ .,
+             data = HCAHPS_sum,
+             method = "knn",
+             trControl = control,
+             tuneLength = 1,
+             tuneGrid=data.frame(k=seq(1,25,2)),
+             metric="Accuracy")
+
+res_knn$results %>% 
+  ggplot(aes(k, Accuracy, ymin= Accuracy - AccuracySD, 
+             ymax = Accuracy + AccuracySD)) +
+  geom_point() + geom_errorbar()
+
+#let's create a model with k = 10
+inTrain <- createDataPartition(y = HCAHPS_sum$H_STAR_RATING, p = 0.7)
+train_set <- slice(HCAHPS_sum, inTrain$Resample1)
+test_set <- slice(HCAHPS_sum, -inTrain$Resample1)
+
+#reset factors for test set
+test_set$H_STAR_RATING <- factor(test_set$H_STAR_RATING)
+
+#fit the data
+fit <- knn3(H_STAR_RATING~., data = train_set, k=12)
+f_hat <- predict(fit, newdata = test_set)
+f_hat_max <- apply(f_hat,1,max)
+pred <- apply(f_hat,1,which.max)
+tab <- table(pred = round(pred), truth = test_set$H_STAR_RATING)
+
+confusionMatrix(tab)
+  
+```
+
+From the above, we see that the remaining metrics in HCAHPS has about a 90% accuracy rating in predicting star ratings.
+
+Now, we will expand our search outside of the HCAHPS and see if metrics from other databases can help us improve our predicitons. Before we link these new metrics to HCAHPS, we will first explore each dataset and examine some additional hypothesis that would impact patient experience.
+
+
+Part 2: Cost
+
+One clear potential predictor in a patient's experience is the cost of treatment.
+
+First, let us sanity check this dataset and verify that cost is higher for more severe treatments.
+
+```{r}
+Severity<- inpatientcost %>% 
+  filter(APR.DRG.Description=="Heart Failure")
+
+#change charge to numeric
+Severity$Mean.Charge <- sub('\\$','', as.character(levels(Severity$Mean.Charge))[Severity$Mean.Charge]) %>%
+  as.numeric()
+
+#boxplot of charge by severity
+Severity %>%
+  ggplot(aes(APR.Severity.of.Illness.Description, Mean.Charge)) +
+  geom_boxplot()
+
+```
+
+As expected, it appears extreme cases have higher charges than the other cases. That being said, interestingly enough, there is not much difference in cost between major and minor treatments.
+
+Let's see if there is a relationship between dischage and mean cost in this dataset. The idea behind this hypothesis is that hospitals that treat more patients for a certain procedure or disorder may have improved efficiencies that allows down to lower the treatmet charge. 
+
+```{r}
+
+#boxplot of charge by severity
+Severity %>%
+  ggplot(aes(Discharges, Mean.Charge)) +
+  geom_point() +
+  facet_wrap(~APR.Severity.of.Illness.Description, scales = "free_x")
+
+```
+
+Unfortunately, it looks like there is no relationship between number of patients seen and cost of treatment. This suggests that, contrary to expectation, hospitals that see more of a case may not actually have an advantage in scalibility to reduce costs.
+
+
+
+Part 2: Mortality
+
+The next potential predictor we will examine is mortality.
+
+We will re-examine our earlier test of the relationship between cost and number of patients seen.
+
 ```{r}
 
 #clean the data
@@ -285,7 +426,6 @@ ggplot(PV, aes(Denominator, Payment)) +
 
 ```
 
-The number of cases does not appear to be correlated with payment. This suggests that, contrary to expectation, hospitals that see more of a case may not actually have an advantage in scalibility to reduce costs.
 
 Let's now see whether value of care, as defined by mortality and payment intersection, is impacted by the number of cases seen.
 
@@ -454,36 +594,3 @@ kable(res_Adj)
 ```
 
 We see about the same relationship of 0.01%-0.04% decrease in mortality rate for each additional case seen.
-
-Now, let us move on to examining severity's relationship with cost and number of cases
-
-```{r}
-Severity<- inpatientcost %>% 
-  filter(APR.DRG.Description=="Heart Failure")
-
-#change charge to numeric
-Severity$Mean.Charge <- sub('\\$','', as.character(levels(Severity$Mean.Charge))[Severity$Mean.Charge]) %>%
-  as.numeric()
-
-#boxplot of charge by severity
-Severity %>%
-  ggplot(aes(APR.Severity.of.Illness.Description, Mean.Charge)) +
-  geom_boxplot()
-
-```
-
-As expected, it appears extreme cases have higher charges than the other cases.
-
-Let's see if there is a relationship between dischage and mean cost in this dataset, which we could not find in the prior paymentandvalue one.
-
-```{r}
-
-#boxplot of charge by severity
-Severity %>%
-  ggplot(aes(Discharges, Mean.Charge)) +
-  geom_point() +
-  facet_wrap(~APR.Severity.of.Illness.Description, scales = "free_x")
-
-```
-
-Here, we reaffirm our earlier observation that number of cases does not appear to impact individual cost.

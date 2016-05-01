@@ -412,7 +412,48 @@ kable(res_HF)
 kable(res_AMI)
 ```
 
-From the above, we can see that with each additional case of HF, a hospital's rate of mortality decreases between 0.01% to 0.02%. For AMI, the rate of decrease is even higher at 0.01% to 0.04%.
+From the above, we can see that with each additional case of HF, a hospital's rate of mortality decreases between 0.01% to 0.02%. For AMI, the rate of decrease is even higher at 0.01% to 0.04%. 
+
+Another database that has mortality rating is PCIbyhospital. Let's see if we can find the same relationship there.
+
+```{r}
+
+#removing observed mortality rate of 0
+PCI_mort <- PCIbyhospital %>%
+  filter(Procedure == "All PCI", Hospital.Name != "NYS - All Hospitals", Observed.Mortality.Rate >0) %>%
+  select(Number.of.Cases, Observed.Mortality.Rate, Risk.Adjusted.Mortality.Rate)
+
+#plot Risk Adjusted rates
+PCI_mort %>%
+  ggplot(aes(Number.of.Cases, Risk.Adjusted.Mortality.Rate)) +
+  geom_point() +
+  geom_smooth()
+
+#plot observed rate
+PCI_mort %>%
+  ggplot(aes(Number.of.Cases, Observed.Mortality.Rate)) +
+  geom_point() +
+  geom_smooth()
+
+```
+
+We see a fairly sharp drop in mortality rate that plateaus once the number of cases surpasses 500. This appears to apply to both the observed and risk adjusted mortality rate. Let's now fit a regression to number of cases against the two rates.
+
+```{r}
+
+res_Obs <- PCI_mort %>%
+  lm(Risk.Adjusted.Mortality.Rate ~ Number.of.Cases, data = .) %>%
+  tidy(conf.int = TRUE)
+
+res_Adj <- PCI_mort %>%
+  lm(Observed.Mortality.Rate ~ Number.of.Cases, data = .) %>%
+  tidy(conf.int = TRUE)
+
+kable(res_Obs)
+kable(res_Adj)
+```
+
+We see about the same relationship of 0.01%-0.04% decrease in mortality rate for each additional case seen.
 
 Now, let us move on to examining severity's relationship with cost and number of cases
 

@@ -356,9 +356,41 @@ Let's see what happens when we leverage another database that has actual mortali
 
 ```{r}
 CH <- complicationshospital %>%
+  select(Measure.ID, Denominator, Score)
+
+#change score and denominator to number
+CH$Denominator <- as.numeric(as.character(CH$Denominator))
+CH$Score <- as.numeric(as.character(CH$Score))
+
+#let's look at the relationship for HF only
+CH %>%
+  filter(Measure.ID == "MORT_30_HF") %>%
+  ggplot(aes(Denominator, Score)) +
+  geom_point() +
+  geom_smooth()
+```
+
+We see that it appears like mortality rates decrease with higher number of cases for heart failure
+
+```{r}
+#let's look at the relationship for HF only
+CH %>%
+  filter(Measure.ID %in% c("MORT_30_HF", "MORT_30_AMI")) %>%
+  ggplot(aes(Denominator, Score), colour = factor(Measure.ID)) +
+  geom_point() +
+  geom_smooth() 
 
 ```
 
+Let's see what happens when we try to fit a regression
+```{r}
+library(broom)
+res <- CH %>%
+  lm(Score ~ Denominator, data = .) %>%
+  tidy()
+```
+
+Looks like regression is a good way to predict mortality score
 
 Now, let us move on to examining severity's relationship with cost and number of cases
 

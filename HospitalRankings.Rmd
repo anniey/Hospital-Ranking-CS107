@@ -350,7 +350,45 @@ tab
 
 ```
 
-From the table of results above, we can see that while there may appear to be some difference in number of cases seen between the three categories of mortality, the difference is not great enough for number of cases to be used as a predictor of mortality. That being said, the small size of the dataset may also be at play here.
+From the table of results above, we can see that while there may appear to be some difference in number of cases seen between the three categories of mortality, the difference is not great enough for number of cases to be used as a predictor of mortality. That being said, the small size of the dataset and the arbitrary cutoff may be at play here.
+
+Let's see what happens when we leverage another database that has actual mortality rates.
+
+```{r}
+CH <- complicationshospital %>%
 
 ```
 
+
+Now, let us move on to examining severity's relationship with cost and number of cases
+
+```{r}
+Severity<- inpatientcost %>% 
+  filter(APR.DRG.Description=="Heart Failure")
+
+#change charge to numeric
+Severity$Mean.Charge <- sub('\\$','', as.character(levels(Severity$Mean.Charge))[Severity$Mean.Charge]) %>%
+  as.numeric()
+
+#boxplot of charge by severity
+Severity %>%
+  ggplot(aes(APR.Severity.of.Illness.Description, Mean.Charge)) +
+  geom_boxplot()
+
+```
+
+As expected, it appears extreme cases have higher charges than the other cases.
+
+Let's see if there is a relationship between dischage and mean cost in this dataset, which we could not find in the prior paymentandvalue one.
+
+```{r}
+
+#boxplot of charge by severity
+Severity %>%
+  ggplot(aes(Discharges, Mean.Charge)) +
+  geom_point() +
+  facet_wrap(~APR.Severity.of.Illness.Description, scales = "free_x")
+
+```
+
+Here, we reaffirm our earlier observation that number of cases does not appear to impact individual cost.

@@ -40,132 +40,6 @@ readmission <- readmission %>% filter(State=="NY")
 mortality <- mortality %>% filter(State=="NY")
 ```
 
-Combine all the datasets that use Provider ID and Facility ID, respectively
-```{r}
-
-#first, join the datasets with providerIDs
-providerID_data <- complicationshospital %>%
-  select(c(Provider.ID, Hospital.Name, Measure.Name, Measure.ID, Compared.to.National, Denominator, Score, Lower.Estimate, Higher.Estimate, Location))
-
-providerID_data <- hcahps %>%
-  select(c(Provider.ID, HCAHPS.Measure.ID, HCAHPS.Question, Patient.Survey.Star.Rating, HCAHPS.Answer.Percent, HCAHPS.Linear.Mean.Value)) %>%
-  transform(Provider.ID = factor(Provider.ID)) %>%
-  right_join(providerID_data, by = "Provider.ID")
-
-providerID_data <- paymentandvalue %>%
-  select(c(Provider.ID, Payment.measure.ID, Payment.measure.name, Payment.category, Denominator, Payment, Value.of.care.display.ID, Value.of.care.display.name, Value.of.care.category)) %>%
-  right_join(providerID_data, by = "Provider.ID")
-
-#split the coordinates from the location column. we will use it later to help ID hospitals with varying name conventions btw the provider and facility dataset
-providerID_data <- providerID_data %>%
-  separate(Location, into = c("Location", "Location.1"), sep = "\\(")
-  
-#next join all the datasets with facility ID (remove 2008 from hospitalinfection)
-facilityID_data <- hospitalinfection %>%
-  select(-c(Hospital.Name)) %>%
-  filter(Year > 2008) %>%
-  right_join(inpatientcost, by = c("Facility.Id", "Year"))
-
-colnames(PCIbyhospital)[1] <- "Facility.Id"
-colnames(PCIbyhospital)[6] <- "Year"
-
-temp <- PCIbyhospital %>%
-  select(-c(Detailed.Region, Region, Hospital.Name)) %>%
-  transform(Year = as.numeric(levels(Year))[Year]) %>%
-  filter(Year %in% c("2010", "2011", "2012"))
-
-facilityID_data <- facilityID_data %>%
-  filter(Year > 2009) %>%
-  left_join(temp, by = c("Facility.Id", "Year"))
-
-#clean case convention and column name
-facilityID_data$Facility.Name <- toupper(facilityID_data$Facility.Name)
-
-colnames(facilityID_data)[13] <- c("Hospital.Name")
-```
-
-
-Now let's try to join the ProviderID dataset with the FacilityID dataset using the Hospital/Facility Name. First, we need to clean up some of the varying naming conventions between the two datasets. We will use ProviderID as the convention since it has the shorter list
-
-```{r}
-#find the hospital names that are slightly different between the datasets
-
-facilityID_data$Hospital.Name <- as.character(facilityID_data$Hospital.Name)
-providerID_data$Hospital.Name <- as.character(providerID_data$Hospital.Name)
-
-FacilityNames <- facilityID_data %>%
-  select(Hospital.Name, Location.1) %>%
-  as.data.frame() %>%
-  unique()
-
-HospitalNames <- providerID_data %>%
-  select(Hospital.Name, Location.1) %>%
-  as.data.frame() %>%
-  unique()
-
-#merge the tables and find where there is unmerged rows
-ProblemNames <- merge(FacilityNames, HospitalNames, by = "Hospital.Name", all = TRUE)
-
-```
-
-
-Quickly scanning the list of merged names, we notice that a common difference in convention between the datasets is the use of "INC" vs ", INC". Let's update FacilityID from "INC" to ", INC".
-```{r}
-
-#Update FacilityID's uses "INC" to match ProviderID's ", INC"
-facilityID_data$Hospital.Name <- gsub(" INC", ", INC", facilityID_data$Hospital.Name)
-
-#rerun the merged datasets
-FacilityNames <- facilityID_data %>%
-  select(Hospital.Name, Location.1) %>%
-  as.data.frame() %>%
-  unique()
-
-#merge the tables and find where there is unmerged rows
-ProblemNames <- merge(FacilityNames, HospitalNames, by = "Hospital.Name", all = TRUE)
-```
-
-It also looks like the facility database has separate IDs for different divisions of a hospital provider. Let's remap all these divisions to the parent provider
-```{r}
-
-#rename Catskill to remove from further cleaning
-facilityID_data$Hospital.Name <- gsub("CATSKILL REGIONAL MEDICAL CENTER - G. HERMANN SITE", "CATSKILL REGIONAL MEDICAL CENTER G HERMANN SITE", facilityID_data$Hospital.Name)
-
-#remove division name following -
-facilityID_data$Hospital.Name <- gsub(" - [A-z ]*", "", facilityID_data$Hospital.Name)
-
-#refilter uniques
-FacilityNames <- facilityID_data %>%
-  select(Hospital.Name, Location.1) %>%
-  as.data.frame()
-
-FacilityNames <- FacilityNames[!duplicated(FacilityNames[,1]),]
-
-#merge the tables and find where there is unmerged rows
-ProblemNames <- full_join(FacilityNames, HospitalNames, by = "Hospital.Name")
-
-```
-
-We still have a couple more manual changes to make
-
-```{r}
-
-#create table remapping facility name to hospital name
-facility_orig = c("ADIRONDACK MEDICAL CENTER-SARANAC LAKE SITE", "BROOKHAVEN MEMORIAL HOSPITAL MEDICAL CENTER INC", "BROOKLYN HOSPITAL CENTER AT DOWNTOWN CAMPUS", "CATSKILL REGIONAL MEDICAL CENTER - G. HERMANN SITE", "CHAMPLAIN VALLEY PHYSICIANS HOSPITAL MEDICAL CENTER", "CLIFTON-FINE HOSPITAL", "FAXTON-ST LUKES HEALTHCARE ST LUKES DIVISION", "FAXTON-ST LUKES HEALTHCARE FAXTON DIVISION", "JOHN T MATHER MEMORIAL HOSPITAL OF PORT JEFFERSON NEW YORK, INC", "MARGARETVILLE HOSPITAL", "MONTEFIORE", "MONTEFIORE MED CENTER", "MONTEFIORE MEDICAL CENTER& LUCY MOSES DIV", "MOUNT VERNON HOSPITAL", "MOUNT ST MARYS HOSPITAL AND HEALTH CENTER", "NEW YORK COMMUNITY HOSPITAL OF BROOKLYN,, INC", "NEW YORK PRESBYTERIAN HOSPITAL", "RIVER HOSPITAL,, INC.", "ROME MEMORIAL HOSPITAL,, INC", "SCHUYLER HOSPITAL", "SOLDIERS AND SAILORS MEMORIAL HOSPITAL OF YATES, INC", "ST JOHNS EPISCOPAL HOSPITAL SO SHORE", "ST JOSEPHS HOSPITAL", "ST JOSEPHS HOSPITAL HEALTH CENTER", "ST JOSEPH'S MC-ST VINCENTS WESTCHESTER DIVISION", "ST LUKE'S CORNWALL HOSPITAL/NEWBURGH", "ST LUKES ROOSEVELT HOSPITAL", "ST LUKES ROOSEVELT HOSPITAL CENTER", "ST PETERS HOSPITAL", "ST. JOSEPH HOSPITAL", "STATEN ISLAND UNIVERSITY HOSP-NORTH", "STATEN ISLAND UNIVERSITY HOSP-SOUTH", "UNITED HEALTH SERVICES HOSPITALS, INC.", "UNITED MEMORIAL MEDICAL CENTER BANK STREET CAMPUS", "UNITED MEMORIAL MEDICAL CENTER NORTH STREET CAMPUS", "UNIVERSITY HOSPITAL", "UNIVERSITY HOSPITAL OF BROOKLYN", "UNIVERSITY HOSPITAL SUNY HEALTH SCIENCE CENTER", "WOMANS CHRISTIAN ASSOC HOSPITAL", "WOODHULL MEDICAL & MENTAL HEALTH CENTER")
-
-facility_new = c("ADIRONDACK MEDICAL CENTER", "BROOKHAVEN MEMORIAL HOSPITAL MEDICAL CENTER", "BROOKLYN HOSPITAL CENTER", "CATSKILL REGIONAL MEDICAL CENTER - G HERMANN SITE", "CHAMPLAIN VALLEY PHYSICIANS HOSPITAL MEDICAL CTR", "CLIFTON FINE HOSPITAL", "FAXTON-ST LUKE'S HEALTHCARE", "FAXTON-ST LUKE'S HEALTHCARE", "JOHN T MATHER MEMORIAL HOSPITAL OF PORT JEFFERSON", "MARGARETVILLE MEMORIAL HOSPITAL", "MONTEFIORE MEDICAL CENTER", "MONTEFIORE MEDICAL CENTER", "MONTEFIORE MEDICAL CENTER", "MONTEFIORE MOUNT VERNON HOSPITAL", "MOUNT ST MARY'S HOSPITAL AND HEALTH CENTER", "NEW YORK COMMUNITY HOSPITAL OF BROOKLYN, INC.", "NEW YORK-PRESBYTERIAN HOSPITAL", "RIVER HOSPITAL, INC", "ROME MEMORIAL HOSPITAL, INC", "SCHUYLER HOSPITAL, INC", "SOLDIERS AND SAILORS MEMORIAL HOSPITAL OF YATES", "ST JOHN'S EPISCOPAL HOSPITAL AT SOUTH SHORE", "ST JOSEPH'S HOSPITAL, INC", "ST JOSEPH'S HOSPITAL HEALTH CENTER", "ST JOSEPH'S MEDICAL CENTER", "ST LUKE'S CORNWALL HOSPITAL", "ST LUKE'S ROOSEVELT HOSPITAL","ST LUKE'S ROOSEVELT HOSPITAL CENTER", "ST PETER'S HOSPITAL", "ST JOSEPH HOSPITAL", "STATEN ISLAND UNIVERSITY HOSPITAL", "STATEN ISLAND UNIVERSITY HOSPITAL", "UNITED HEALTH SERVICES HOSPITALS, INC", "UNITED MEMORIAL MEDICAL CENTER", "UNITED MEMORIAL MEDICAL CENTER", "UNIVERSITY HOSPITAL (STONY BROOK)", "UNIVERSITY HOSPITAL OF BROOKLYN (DOWNSTATE)", "UNIVERSITY HOSPITAL S U N Y HEALTH SCIENCE CENTER", "WOMAN'S CHRISTIAN ASSOCIATION HOSPITAL", "WOODHULL MEDICAL AND MENTAL HEALTH CENTER")
-
-#renaming table
-remapped_names <- data.frame("Facility Name" = facility_orig, "Provider Name" = facility_new, stringsAsFactors = FALSE)
-
-#rename the hospitals in the facilityID_data
-facilityID_data$Hospital.Name <- sapply(facilityID_data$Hospital.Name, function(x){
-  ifelse(x %in% remapped_names$Facility.Name, remapped_names[facility_orig == x, 2], x)
-})
-
-
-
-```
 
 Michael's relationship exploration space
 
@@ -594,3 +468,129 @@ kable(res_Adj)
 ```
 
 We see about the same relationship of 0.01%-0.04% decrease in mortality rate for each additional case seen.
+
+
+Combine all the datasets that use Provider ID and Facility ID, respectively
+```{r}
+
+#first, join the datasets with providerIDs
+providerID_data <- complicationshospital %>%
+  select(c(Provider.ID, Hospital.Name, Measure.Name, Measure.ID, Compared.to.National, Denominator, Score, Lower.Estimate, Higher.Estimate, Location))
+
+providerID_data <- hcahps %>%
+  select(c(Provider.ID, HCAHPS.Measure.ID, HCAHPS.Question, Patient.Survey.Star.Rating, HCAHPS.Answer.Percent, HCAHPS.Linear.Mean.Value)) %>%
+  transform(Provider.ID = factor(Provider.ID)) %>%
+  right_join(providerID_data, by = "Provider.ID")
+
+providerID_data <- paymentandvalue %>%
+  select(c(Provider.ID, Payment.measure.ID, Payment.measure.name, Payment.category, Denominator, Payment, Value.of.care.display.ID, Value.of.care.display.name, Value.of.care.category)) %>%
+  right_join(providerID_data, by = "Provider.ID")
+
+#split the coordinates from the location column. we will use it later to help ID hospitals with varying name conventions btw the provider and facility dataset
+providerID_data <- providerID_data %>%
+  separate(Location, into = c("Location", "Location.1"), sep = "\\(")
+  
+#next join all the datasets with facility ID (remove 2008 from hospitalinfection)
+facilityID_data <- hospitalinfection %>%
+  select(-c(Hospital.Name)) %>%
+  filter(Year > 2008) %>%
+  right_join(inpatientcost, by = c("Facility.Id", "Year"))
+
+colnames(PCIbyhospital)[1] <- "Facility.Id"
+colnames(PCIbyhospital)[6] <- "Year"
+
+temp <- PCIbyhospital %>%
+  select(-c(Detailed.Region, Region, Hospital.Name)) %>%
+  transform(Year = as.numeric(levels(Year))[Year]) %>%
+  filter(Year %in% c("2010", "2011", "2012"))
+
+facilityID_data <- facilityID_data %>%
+  filter(Year > 2009) %>%
+  left_join(temp, by = c("Facility.Id", "Year"))
+
+#clean case convention and column name
+facilityID_data$Facility.Name <- toupper(facilityID_data$Facility.Name)
+
+colnames(facilityID_data)[13] <- c("Hospital.Name")
+```
+
+
+Now let's try to join the ProviderID dataset with the FacilityID dataset using the Hospital/Facility Name. First, we need to clean up some of the varying naming conventions between the two datasets. We will use ProviderID as the convention since it has the shorter list
+
+```{r}
+#find the hospital names that are slightly different between the datasets
+
+facilityID_data$Hospital.Name <- as.character(facilityID_data$Hospital.Name)
+providerID_data$Hospital.Name <- as.character(providerID_data$Hospital.Name)
+
+FacilityNames <- facilityID_data %>%
+  select(Hospital.Name, Location.1) %>%
+  as.data.frame() %>%
+  unique()
+
+HospitalNames <- providerID_data %>%
+  select(Hospital.Name, Location.1) %>%
+  as.data.frame() %>%
+  unique()
+
+#merge the tables and find where there is unmerged rows
+ProblemNames <- merge(FacilityNames, HospitalNames, by = "Hospital.Name", all = TRUE)
+
+```
+
+
+Quickly scanning the list of merged names, we notice that a common difference in convention between the datasets is the use of "INC" vs ", INC". Let's update FacilityID from "INC" to ", INC".
+```{r}
+
+#Update FacilityID's uses "INC" to match ProviderID's ", INC"
+facilityID_data$Hospital.Name <- gsub(" INC", ", INC", facilityID_data$Hospital.Name)
+
+#rerun the merged datasets
+FacilityNames <- facilityID_data %>%
+  select(Hospital.Name, Location.1) %>%
+  as.data.frame() %>%
+  unique()
+
+#merge the tables and find where there is unmerged rows
+ProblemNames <- merge(FacilityNames, HospitalNames, by = "Hospital.Name", all = TRUE)
+```
+
+It also looks like the facility database has separate IDs for different divisions of a hospital provider. Let's remap all these divisions to the parent provider
+```{r}
+
+#rename Catskill to remove from further cleaning
+facilityID_data$Hospital.Name <- gsub("CATSKILL REGIONAL MEDICAL CENTER - G. HERMANN SITE", "CATSKILL REGIONAL MEDICAL CENTER G HERMANN SITE", facilityID_data$Hospital.Name)
+
+#remove division name following -
+facilityID_data$Hospital.Name <- gsub(" - [A-z ]*", "", facilityID_data$Hospital.Name)
+
+#refilter uniques
+FacilityNames <- facilityID_data %>%
+  select(Hospital.Name, Location.1) %>%
+  as.data.frame()
+
+FacilityNames <- FacilityNames[!duplicated(FacilityNames[,1]),]
+
+#merge the tables and find where there is unmerged rows
+ProblemNames <- full_join(FacilityNames, HospitalNames, by = "Hospital.Name")
+
+```
+
+We still have a couple more manual changes to make
+
+```{r}
+
+#create table remapping facility name to hospital name
+facility_orig = c("ADIRONDACK MEDICAL CENTER-SARANAC LAKE SITE", "BROOKHAVEN MEMORIAL HOSPITAL MEDICAL CENTER INC", "BROOKLYN HOSPITAL CENTER AT DOWNTOWN CAMPUS", "CATSKILL REGIONAL MEDICAL CENTER - G. HERMANN SITE", "CHAMPLAIN VALLEY PHYSICIANS HOSPITAL MEDICAL CENTER", "CLIFTON-FINE HOSPITAL", "FAXTON-ST LUKES HEALTHCARE ST LUKES DIVISION", "FAXTON-ST LUKES HEALTHCARE FAXTON DIVISION", "JOHN T MATHER MEMORIAL HOSPITAL OF PORT JEFFERSON NEW YORK, INC", "MARGARETVILLE HOSPITAL", "MONTEFIORE", "MONTEFIORE MED CENTER", "MONTEFIORE MEDICAL CENTER& LUCY MOSES DIV", "MOUNT VERNON HOSPITAL", "MOUNT ST MARYS HOSPITAL AND HEALTH CENTER", "NEW YORK COMMUNITY HOSPITAL OF BROOKLYN,, INC", "NEW YORK PRESBYTERIAN HOSPITAL", "RIVER HOSPITAL,, INC.", "ROME MEMORIAL HOSPITAL,, INC", "SCHUYLER HOSPITAL", "SOLDIERS AND SAILORS MEMORIAL HOSPITAL OF YATES, INC", "ST JOHNS EPISCOPAL HOSPITAL SO SHORE", "ST JOSEPHS HOSPITAL", "ST JOSEPHS HOSPITAL HEALTH CENTER", "ST JOSEPH'S MC-ST VINCENTS WESTCHESTER DIVISION", "ST LUKE'S CORNWALL HOSPITAL/NEWBURGH", "ST LUKES ROOSEVELT HOSPITAL", "ST LUKES ROOSEVELT HOSPITAL CENTER", "ST PETERS HOSPITAL", "ST. JOSEPH HOSPITAL", "STATEN ISLAND UNIVERSITY HOSP-NORTH", "STATEN ISLAND UNIVERSITY HOSP-SOUTH", "UNITED HEALTH SERVICES HOSPITALS, INC.", "UNITED MEMORIAL MEDICAL CENTER BANK STREET CAMPUS", "UNITED MEMORIAL MEDICAL CENTER NORTH STREET CAMPUS", "UNIVERSITY HOSPITAL", "UNIVERSITY HOSPITAL OF BROOKLYN", "UNIVERSITY HOSPITAL SUNY HEALTH SCIENCE CENTER", "WOMANS CHRISTIAN ASSOC HOSPITAL", "WOODHULL MEDICAL & MENTAL HEALTH CENTER")
+
+facility_new = c("ADIRONDACK MEDICAL CENTER", "BROOKHAVEN MEMORIAL HOSPITAL MEDICAL CENTER", "BROOKLYN HOSPITAL CENTER", "CATSKILL REGIONAL MEDICAL CENTER - G HERMANN SITE", "CHAMPLAIN VALLEY PHYSICIANS HOSPITAL MEDICAL CTR", "CLIFTON FINE HOSPITAL", "FAXTON-ST LUKE'S HEALTHCARE", "FAXTON-ST LUKE'S HEALTHCARE", "JOHN T MATHER MEMORIAL HOSPITAL OF PORT JEFFERSON", "MARGARETVILLE MEMORIAL HOSPITAL", "MONTEFIORE MEDICAL CENTER", "MONTEFIORE MEDICAL CENTER", "MONTEFIORE MEDICAL CENTER", "MONTEFIORE MOUNT VERNON HOSPITAL", "MOUNT ST MARY'S HOSPITAL AND HEALTH CENTER", "NEW YORK COMMUNITY HOSPITAL OF BROOKLYN, INC.", "NEW YORK-PRESBYTERIAN HOSPITAL", "RIVER HOSPITAL, INC", "ROME MEMORIAL HOSPITAL, INC", "SCHUYLER HOSPITAL, INC", "SOLDIERS AND SAILORS MEMORIAL HOSPITAL OF YATES", "ST JOHN'S EPISCOPAL HOSPITAL AT SOUTH SHORE", "ST JOSEPH'S HOSPITAL, INC", "ST JOSEPH'S HOSPITAL HEALTH CENTER", "ST JOSEPH'S MEDICAL CENTER", "ST LUKE'S CORNWALL HOSPITAL", "ST LUKE'S ROOSEVELT HOSPITAL","ST LUKE'S ROOSEVELT HOSPITAL CENTER", "ST PETER'S HOSPITAL", "ST JOSEPH HOSPITAL", "STATEN ISLAND UNIVERSITY HOSPITAL", "STATEN ISLAND UNIVERSITY HOSPITAL", "UNITED HEALTH SERVICES HOSPITALS, INC", "UNITED MEMORIAL MEDICAL CENTER", "UNITED MEMORIAL MEDICAL CENTER", "UNIVERSITY HOSPITAL (STONY BROOK)", "UNIVERSITY HOSPITAL OF BROOKLYN (DOWNSTATE)", "UNIVERSITY HOSPITAL S U N Y HEALTH SCIENCE CENTER", "WOMAN'S CHRISTIAN ASSOCIATION HOSPITAL", "WOODHULL MEDICAL AND MENTAL HEALTH CENTER")
+
+#renaming table
+remapped_names <- data.frame("Facility Name" = facility_orig, "Provider Name" = facility_new, stringsAsFactors = FALSE)
+
+#rename the hospitals in the facilityID_data
+facilityID_data$Hospital.Name <- sapply(facilityID_data$Hospital.Name, function(x){
+  ifelse(x %in% remapped_names$Facility.Name, remapped_names[facility_orig == x, 2], x)
+})
+
+```

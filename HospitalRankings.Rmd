@@ -40,6 +40,11 @@ readmission <- readmission %>% filter(State=="NY")
 mortality <- mortality %>% filter(State=="NY")
 ```
 
+Additiona wrangling of factor to numeric
+```{r}
+complicationshospital$Denominator <- as.numeric(as.character(complicationshospital$Denominator))
+complicationshospital$Score <- as.numeric(as.character(complicationshospital$Score))
+```
 
 Michael's relationship exploration space
 
@@ -144,30 +149,30 @@ Part 1: Examinig HCAHPS
 
 ```{r}
 #spread the ratings and the other scores
-HCAHPS_sum <- hcahps %>%
+HCAHPS <- hcahps %>%
   select(Provider.ID, HCAHPS.Measure.ID, Patient.Survey.Star.Rating) %>%
   filter(HCAHPS.Measure.ID == "H_STAR_RATING") %>%
   spread(HCAHPS.Measure.ID, Patient.Survey.Star.Rating)
 
-HCAHPS_sum <- hcahps %>%
+HCAHPS <- hcahps %>%
   select(Provider.ID, HCAHPS.Measure.ID, HCAHPS.Linear.Mean.Value) %>%
   filter(HCAHPS.Measure.ID %in% c("H_CLEAN_LINEAR_SCORE", "H_COMP_1_LINEAR_SCORE", "H_COMP_2_LINEAR_SCORE","H_COMP_3_LINEAR_SCORE", "H_COMP_4_LINEAR_SCORE","H_COMP_5_LINEAR_SCORE", "H_COMP_6_LINEAR_SCORE","H_COMP_7_LINEAR_SCORE","H_HSP_RATING_LINEAR_SCORE", "H_QUIET_LINEAR_SCORE")) %>%
-  right_join(HCAHPS_sum, by = "Provider.ID")
+  right_join(HCAHPS, by = "Provider.ID")
 
-HCAHPS_sum[HCAHPS_sum == "Not Available"] = NA
-HCAHPS_sum <- na.omit(HCAHPS_sum)
+HCAHPS[HCAHPS == "Not Available"] = NA
+HCAHPS <- na.omit(HCAHPS)
 
-HCAHPS_sum$HCAHPS.Linear.Mean.Value <- as.numeric(as.character(HCAHPS_sum$HCAHPS.Linear.Mean.Value))
+HCAHPS$HCAHPS.Linear.Mean.Value <- as.numeric(as.character(HCAHPS$HCAHPS.Linear.Mean.Value))
 
 #refactor star rating to account for removed factors
-HCAHPS_sum$H_STAR_RATING <- factor(HCAHPS_sum$H_STAR_RATING)
+HCAHPS$H_STAR_RATING <- factor(HCAHPS$H_STAR_RATING)
 
 ```
 
 Let's plot these scores and see if there is any relationship to star rating.
 
 ```{r}
-HCAHPS_sum %>%
+HCAHPS %>%
   ggplot(aes(H_STAR_RATING, HCAHPS.Linear.Mean.Value)) +
   geom_boxplot()
 
@@ -177,8 +182,10 @@ A quick look at the aggregated scores against star ratings boxplot shows a weak 
 
 ```{r}
 #find the distance between the scores and star rating
-HCAHPS_sum <- HCAHPS_sum %>%
-  spread(HCAHPS.Measure.ID, HCAHPS.Linear.Mean.Value) %>%
+HCAHPS <- HCAHPS %>%
+  spread(HCAHPS.Measure.ID, HCAHPS.Linear.Mean.Value) 
+
+HCAHPS_sum <- HCAHPS %>%
   select(-c(Provider.ID))
 
 HCAHPS_dist <- as.matrix(HCAHPS_sum) %>%
@@ -374,9 +381,6 @@ Let's see what happens when we leverage another database that has actual mortali
 CH <- complicationshospital %>%
   select(Measure.ID, Denominator, Score)
 
-#change score and denominator to number
-CH$Denominator <- as.numeric(as.character(CH$Denominator))
-CH$Score <- as.numeric(as.character(CH$Score))
 
 #let's look at the relationship for HF only
 CH %>%
@@ -469,22 +473,74 @@ kable(res_Adj)
 
 We see about the same relationship of 0.01%-0.04% decrease in mortality rate for each additional case seen.
 
+Final Data exploration
+
+Now that we have explored the other datasets. Let's add the additional metrics to the HCAHPS dataset and see if we can improve our model.
 
 Combine all the datasets that use Provider ID and Facility ID, respectively
 ```{r}
 
-#first, join the datasets with providerIDs
+#first, join HCAHPS with other national datasets (complications)
 providerID_data <- complicationshospital %>%
-  select(c(Provider.ID, Hospital.Name, Measure.Name, Measure.ID, Compared.to.National, Denominator, Score, Lower.Estimate, Higher.Estimate, Location))
+  select(c(Provider.ID, Hospital.Name, Measure.ID, Score)) %>%
+  spread(Measure.ID, Score)
 
-providerID_data <- hcahps %>%
-  select(c(Provider.ID, HCAHPS.Measure.ID, HCAHPS.Question, Patient.Survey.Star.Rating, HCAHPS.Answer.Percent, HCAHPS.Linear.Mean.Value)) %>%
+providerID_data[providerID_data == "Not Available"] = NA
+
+#add number of cases seen in aggregation, as proxy for hospital size
+providerID_data <- complicationshospital %>%
+  select(Provider.ID, Denominator) %>%
+  group_by(Provider.ID) %>%
+  summarise(cases = count(Denominator)) 
+  right_join(providerID_data, by = "Provider.ID")
+           
+providerID_data <- HCAHPS %>%
   transform(Provider.ID = factor(Provider.ID)) %>%
   right_join(providerID_data, by = "Provider.ID")
 
-providerID_data <- paymentandvalue %>%
-  select(c(Provider.ID, Payment.measure.ID, Payment.measure.name, Payment.category, Denominator, Payment, Value.of.care.display.ID, Value.of.care.display.name, Value.of.care.category)) %>%
-  right_join(providerID_data, by = "Provider.ID")
+```
+
+If we visualize the mortatlity rates, do we observe the same pattern on improved metrics as star ratings increase?
+
+```{r}
+providerID_data %>% 
+  select(H_STAR_RATING, MORT_30_AMI) %>%
+  ggplot(aes(H_STAR_RATING, MORT_30_AMI)) +
+  geom_boxplot()
+
+providerID_data %>% 
+  select(H_STAR_RATING, MORT_30_HF) %>%
+  ggplot(aes(H_STAR_RATING, MORT_30_HF)) +
+  geom_boxplot()
+
+providerID_data %>% 
+  select(H_STAR_RATING, MORT_30_STK) %>%
+  ggplot(aes(H_STAR_RATING, MORT_30_STK)) +
+  geom_boxplot()
+```
+
+It looks like there is no consistent relationship between mortality star ratings. AMI mortality rates only had a slight decline with increased star rating while HF mortality rates appear to actually increase with higher star ratings.
+
+```{r}
+providerID_data %>% 
+  select(H_STAR_RATING, READM_30_AMI) %>%
+  ggplot(aes(H_STAR_RATING, READM_30_AMI)) +
+  geom_boxplot()
+
+providerID_data %>% 
+  select(H_STAR_RATING, READM_30_HF) %>%
+  ggplot(aes(H_STAR_RATING, READM_30_HF)) +
+  geom_boxplot()
+
+providerID_data %>% 
+  select(H_STAR_RATING, READM_30_STK) %>%
+  ggplot(aes(H_STAR_RATING, READM_30_STK)) +
+  geom_boxplot()
+```
+
+
+```{r}
+
 
 #split the coordinates from the location column. we will use it later to help ID hospitals with varying name conventions btw the provider and facility dataset
 providerID_data <- providerID_data %>%

@@ -10,8 +10,6 @@ Load data from local file:
 library(dplyr)
 library(tidyr)
 library(ggplot2)
-library(broom)
-library(knitr)
 #cost sets
 paymentandvalue <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/Payment_and_value_of_care_-_Hospital.csv") #national
 inpatientcost <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/Hospital_Inpatient_Cost_Transparency__Beginning_2009.csv") #NYS
@@ -22,7 +20,7 @@ hospitalinfection <- read.csv("https://raw.githubusercontent.com/anniey/Hospital
 complicationshospital <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/Readmissions_Complications_and_Deaths_-_Hospital.csv") #national
 
 #service
-hcahps <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/hcahps.csv") #national
+hcahps <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/hcahps.csv") #NYS
 timely <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/Timely_and_Effective_Care_-_Hospital.csv") #national
 
 #readmisisons
@@ -33,6 +31,7 @@ readmission <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranki
 Limit Data Sets to NYS only:
 ```{r}
 paymentandvalue <- paymentandvalue %>% filter(State=="NY")
+paymentandvalue <- paymentandvalue %>% filter(State=="NY")
 complicationshospital <- complicationshospital %>% filter(State=="NY")
 hcahps <- hcahps %>% filter(State=="NY")
 timely <- timely %>% filter(State=="NY")
@@ -40,507 +39,21 @@ readmission <- readmission %>% filter(State=="NY")
 mortality <- mortality %>% filter(State=="NY")
 ```
 
-Additiona wrangling of factor to numeric
-```{r}
-complicationshospital$Denominator <- as.numeric(as.character(complicationshospital$Denominator))
-complicationshospital$Score <- as.numeric(as.character(complicationshospital$Score))
-```
-
-Michael's relationship exploration space
-
-I expected cost to improve with the number of cases seen, does it?
-```{r}
-PN <- providerID_data %>%
-  filter(Payment.measure.ID=="PAYM_30_PN") %>%
-  select(Provider.ID, Denominator.x, Payment, Payment.measure.ID) %>%
-  na.omit(PN) %>%
-  filter(Denominator.x != "Not Available")
-PN <- PN[!duplicated(PN), ]
-ggplot(PN, aes(Denominator.x, Payment)) + geom_point()
-
-AMI <- providerID_data %>%
-  filter(Payment.measure.ID=="PAYM_30_AMI") %>%
-  select(Provider.ID, Denominator.x, Payment, Payment.measure.ID) %>%
-  na.omit(AMI) %>%
-  filter(Denominator.x != "Not Available")
-AMI <- AMI[!duplicated(AMI), ]
-ggplot(AMI, aes(Denominator.x, Payment)) + geom_point()
-
-HF <- providerID_data %>%
-  filter(Payment.measure.ID=="PAYM_30_HF") %>%
-  select(Provider.ID, Denominator.x, Payment, Payment.measure.ID) %>%
-  na.omit(HF) %>%
-  filter(Denominator.x != "Not Available")
-HF <- HF[!duplicated(HF), ]
-ggplot(HF, aes(Denominator.x, Payment)) + geom_point()
-```
-No, it does not.
-
-```{r}
-library(scales)
-PCI <- inpatientcost %>% 
-  filter(Year==2010) %>%
-  filter(APR.DRG.Description=="Heart Failure")%>%
-  filter(APR.Severity.of.Illness.Code==1)
-ggplot(PCI, aes(Discharges, Mean.Charge)) + geom_point(color=PCI$APR.Severity.of.Illness.Code) + geom_smooth(method=lm) + scale_x_continuous(trans=log2_trans())
-
-PCI <- inpatientcost %>% 
-  filter(Year==2010) %>%
-  filter(APR.DRG.Description=="Heart Failure")%>%
-  filter(APR.Severity.of.Illness.Code==2)
-ggplot(PCI, aes(Discharges, Mean.Charge)) + geom_point(color=PCI$APR.Severity.of.Illness.Code) + geom_smooth(method=lm) + scale_x_continuous(trans=log2_trans())
-
-PCI <- inpatientcost %>% 
-  filter(Year==2010) %>%
-  filter(APR.DRG.Description=="Heart Failure")%>%
-  filter(APR.Severity.of.Illness.Code==3)
-ggplot(PCI, aes(Discharges, Mean.Charge)) + geom_point(color=PCI$APR.Severity.of.Illness.Code) + geom_smooth(method=lm) + scale_x_continuous(trans=log2_trans())
-```
-Severity does not change costs, neither does number of cases. 
-
-
-```{r}
-#temp <- as.data.frame(unique(providerID_data$Provider.ID))
-#temp2 <- facilityID_data[!duplicated(facilityID_data$Hospital.Name),]
-```
-
-```{r}
-readmissionInfection <- filter(readmission, Measure.Name=="READM-30-COPD-HRRP") %>% 
-  select(Hospital.Name, Provider.Number, Number.of.Readmissions, Number.of.Discharges)
-
-#convert to correct type
-readmissionInfection[, 3] <- as.numeric(as.character( readmissionInfection[, 3] ))
-readmissionInfection[, 4] <- as.numeric(as.character( readmissionInfection[, 4] ))
- #omit NAs
-na.omit(readmissionInfection)
-
-readmissionInfection <- mutate(readmissionInfection, readmissionRate= `Number.of.Readmissions`/`Number.of.Discharges`)
-
-#time in ED
-temp <- timely %>%
-  filter(Measure.ID=="ED_1b") #Median time from emergency department arrival to emergency department departure for admitted emergency department patients
-
-temp <- left_join(temp, readmissionInfection, by= "Hospital.Name") %>%
-  select(Hospital.Name, Measure.ID, Score, Sample, readmissionRate)
-ggplot(temp, aes(x=temp$readmissionRate, y= temp$Score)) + geom_point() + xlab("Readmission Rate") + ylab("ED Wait Times (for admitted patients)")
-```
-
-
-
-```{r}
-#THIS IS DRIVING ME CRAZY
-#Box plot Scores
-complicationshospital <- as.data.frame(complicationshospital)
-temp <- select(complicationshospital, Hospital.Name, Score, Measure.Name)
-temp <- temp$Score %>% gsub("Not Available", NA)
-```
-
-
-Annie's data exploration space
-
-
-The purpose of this project is to examine the Hospital Consumer Assessment of Healthcare Providers and Systems (HCAHPS) and related medical metrics that capture patient's overall experience at a hospital. 
-
-As part of the Affordable Care Act, the government issued the creation of a national, standardized, publicly reported survey of patients' perspectives of hospital care (i.e. the HCAHPS). The HCAHPS contains numerous qualitative measures of a patient's experience including cleanliness of the hospital, pain management, effective communication by doctors and nurses, etc. The most visible and highly focused on these metrics are the star ratings.
-
-Our project will create a predictive model of star ratings for NY hospitals. First, we will look at other metrics within HCAHPS that can be leveraged within our model. Then, we will explore other hospital/Medicare databases and see whether metrics such as cost, mortality rates, infection rates, readmission rates, and waiting times are also predictive of star ratings.
-
-Part 1: Examinig HCAHPS
-
-```{r}
-#spread the ratings and the other scores
-HCAHPS <- hcahps %>%
-  select(Provider.ID, HCAHPS.Measure.ID, Patient.Survey.Star.Rating) %>%
-  filter(HCAHPS.Measure.ID == "H_STAR_RATING") %>%
-  spread(HCAHPS.Measure.ID, Patient.Survey.Star.Rating)
-
-HCAHPS <- hcahps %>%
-  select(Provider.ID, HCAHPS.Measure.ID, HCAHPS.Linear.Mean.Value) %>%
-  filter(HCAHPS.Measure.ID %in% c("H_CLEAN_LINEAR_SCORE", "H_COMP_1_LINEAR_SCORE", "H_COMP_2_LINEAR_SCORE","H_COMP_3_LINEAR_SCORE", "H_COMP_4_LINEAR_SCORE","H_COMP_5_LINEAR_SCORE", "H_COMP_6_LINEAR_SCORE","H_COMP_7_LINEAR_SCORE","H_HSP_RATING_LINEAR_SCORE", "H_QUIET_LINEAR_SCORE")) %>%
-  right_join(HCAHPS, by = "Provider.ID")
-
-HCAHPS[HCAHPS == "Not Available"] = NA
-HCAHPS <- na.omit(HCAHPS)
-
-HCAHPS$HCAHPS.Linear.Mean.Value <- as.numeric(as.character(HCAHPS$HCAHPS.Linear.Mean.Value))
-
-#refactor star rating to account for removed factors
-HCAHPS$H_STAR_RATING <- factor(HCAHPS$H_STAR_RATING)
-
-```
-
-Let's plot these scores and see if there is any relationship to star rating.
-
-```{r}
-HCAHPS %>%
-  ggplot(aes(H_STAR_RATING, HCAHPS.Linear.Mean.Value)) +
-  geom_boxplot()
-
-```
-
-A quick look at the aggregated scores against star ratings boxplot shows a weak positive relationship between the scores and the star rating. Now, let's see which of the scores are most predictive of a hospitals star rating.
-
-```{r}
-#find the distance between the scores and star rating
-HCAHPS <- HCAHPS %>%
-  spread(HCAHPS.Measure.ID, HCAHPS.Linear.Mean.Value) 
-
-HCAHPS_sum <- HCAHPS %>%
-  select(-c(Provider.ID))
-
-HCAHPS_dist <- as.matrix(HCAHPS_sum) %>%
-  t() %>%
-  dist()
-
-heatmap(as.matrix(HCAHPS_dist), margins = c(15,15))
-```
-
-From the heatmap above, it looks like 
-
-```{r}
-#knn
-set.seed(1)
-control <- trainControl(method='cv', number=10, p=.8)
-res_knn <- train(H_STAR_RATING ~ .,
-             data = HCAHPS_sum,
-             method = "knn",
-             trControl = control,
-             tuneLength = 1,
-             tuneGrid=data.frame(k=seq(1,25,2)),
-             metric="Accuracy")
-
-res_knn$results %>% 
-  ggplot(aes(k, Accuracy, ymin= Accuracy - AccuracySD, 
-             ymax = Accuracy + AccuracySD)) +
-  geom_point() + geom_errorbar()
-
-#let's create a model with k = 10
-inTrain <- createDataPartition(y = HCAHPS_sum$H_STAR_RATING, p = 0.7)
-train_set <- slice(HCAHPS_sum, inTrain$Resample1)
-test_set <- slice(HCAHPS_sum, -inTrain$Resample1)
-
-#reset factors for test set
-test_set$H_STAR_RATING <- factor(test_set$H_STAR_RATING)
-
-#fit the data
-fit <- knn3(H_STAR_RATING~., data = train_set, k=12)
-f_hat <- predict(fit, newdata = test_set)
-f_hat_max <- apply(f_hat,1,max)
-pred <- apply(f_hat,1,which.max)
-tab <- table(pred = round(pred), truth = test_set$H_STAR_RATING)
-
-confusionMatrix(tab)
-  
-```
-
-From the above, we see that the remaining metrics in HCAHPS has about a 90% accuracy rating in predicting star ratings.
-
-Now, we will expand our search outside of the HCAHPS and see if metrics from other databases can help us improve our predicitons. Before we link these new metrics to HCAHPS, we will first explore each dataset and examine some additional hypothesis that would impact patient experience.
-
-
-Part 2: Cost
-
-One clear potential predictor in a patient's experience is the cost of treatment.
-
-First, let us sanity check this dataset and verify that cost is higher for more severe treatments.
-
-```{r}
-Severity<- inpatientcost %>% 
-  filter(APR.DRG.Description=="Heart Failure")
-
-#change charge to numeric
-Severity$Mean.Charge <- sub('\\$','', as.character(levels(Severity$Mean.Charge))[Severity$Mean.Charge]) %>%
-  as.numeric()
-
-#boxplot of charge by severity
-Severity %>%
-  ggplot(aes(APR.Severity.of.Illness.Description, Mean.Charge)) +
-  geom_boxplot()
-
-```
-
-As expected, it appears extreme cases have higher charges than the other cases. That being said, interestingly enough, there is not much difference in cost between major and minor treatments.
-
-Let's see if there is a relationship between dischage and mean cost in this dataset. The idea behind this hypothesis is that hospitals that treat more patients for a certain procedure or disorder may have improved efficiencies that allows down to lower the treatmet charge. 
-
-```{r}
-
-#boxplot of charge by severity
-Severity %>%
-  ggplot(aes(Discharges, Mean.Charge)) +
-  geom_point() +
-  facet_wrap(~APR.Severity.of.Illness.Description, scales = "free_x")
-
-```
-
-Unfortunately, it looks like there is no relationship between number of patients seen and cost of treatment. This suggests that, contrary to expectation, hospitals that see more of a case may not actually have an advantage in scalibility to reduce costs.
-
-
-
-Part 2: Mortality
-
-The next potential predictor we will examine is mortality.
-
-We will re-examine our earlier test of the relationship between cost and number of patients seen.
-
-```{r}
-
-#clean the data
-PV <- paymentandvalue %>%
-  select(Provider.ID, Denominator, Payment, Payment.measure.ID, Value.of.care.category) %>%
-  na.omit() %>%
-  filter(Denominator != "Not Available")
-
-#change payment and denominator into numeric
-PV$Payment <- sub('\\$','', as.character(levels(PV$Payment))[PV$Payment]) %>%
-  as.numeric()
-
-PV$Denominator <- sub('\\,','', as.character(levels(PV$Denominator))[PV$Denominator]) %>%
-  as.numeric()
-
-
-#plot cost and number of cases a hospital sees
-ggplot(PV, aes(Denominator, Payment)) + 
-  geom_point() +
-  facet_wrap(~Payment.measure.ID, scales = "free_x") +
-  xlab("Case count")
-
-```
-
-
-Let's now see whether value of care, as defined by mortality and payment intersection, is impacted by the number of cases seen.
-
-```{r}
-#let's now check number of cases and value of care
-PV %>%
-  ggplot(aes(Value.of.care.category, Denominator)) +
-  geom_boxplot() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  ylab("Number of Cases")
-
-#let's check heart disease in particular
-PV %>% filter(Payment.measure.ID == "PAYM_30_HF") %>%
-  ggplot(aes(Value.of.care.category, Denominator)) +
-  geom_boxplot() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  ylab("Number of Cases")
-
-
-```
-
-From the boxplots, we can see that number of cases seen does not appear to vary much between average mortality and worse mortality outcomes. However, it does appear that hospitals with better mortality tend to have seen more cases.
-
-Let's focus on just mortality, ignoring the payment dimension, and observe the impact of cases there.
-
-```{r}
-
-#bucket the mortality rates, ignoring payment
-PV <- PV %>%
-  mutate(Care.Cat = ifelse(grepl("Better mortality", Value.of.care.category), "Better Mortality", 
-                           ifelse(grepl("Average mortality", Value.of.care.category), "Average Mortality", "Worse mortality")))
-
-#let's plot a boxplot of the number of cases by group
-PV %>%
-  ggplot(aes(Care.Cat, Denominator)) +
-  geom_boxplot() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  ylab("Number of Cases") +
-  facet_wrap(~Payment.measure.ID, scales = "free_x")
-
-```
-
-In ignoring the payment categories and focusing on just average vs. better mortality, we can see that mortality does seem to be better at hospitals that observe more cases for all three types of illnesses. Let us see if there is enough 
-
-```{r}
-library(caret)
-set.seed(1)
-#turn character into numeric
-PV <- mutate(PV, Care.Cat = ifelse(grepl("Better mortality", Value.of.care.category), 3, 
-                           ifelse(grepl("Average mortality", Value.of.care.category), 2, 1)))
-
-
-#create train and test sets
-inTrain <- createDataPartition(y = PV$Care.Cat, p = 0.8)
-train_set <- slice(PV, inTrain$Resample1)
-test_set <- slice(PV, -inTrain$Resample1)
-
-#fit the data
-fit <- glm(Care.Cat ~ Denominator, data=train_set)
-pred <- predict(fit, newdata = test_set, type = "response")
-tab <- table(pred = round(pred), truth = test_set$Care.Cat)
-
-tab
-
-```
-
-From the table of results above, we can see that while there may appear to be some difference in number of cases seen between the three categories of mortality, the difference is not great enough for number of cases to be used as a predictor of mortality. That being said, the small size of the dataset and the arbitrary cutoff may be at play here.
-
-Let's see what happens when we leverage another database that has actual mortality rates.
-
-```{r}
-CH <- complicationshospital %>%
-  select(Measure.ID, Denominator, Score)
-
-
-#let's look at the relationship for HF only
-CH %>%
-  filter(Measure.ID == "MORT_30_HF") %>%
-  ggplot(aes(Denominator, Score)) +
-  geom_point() +
-  geom_smooth()
-```
-
-It looks like there is a slightly increase in mortality rate when the number of cases increase, but then it drops off as the number of cases continue to grow. Let's now explore additional measures such as mortality rate for AMI and Strokes.
-
-```{r}
-#let's look at the relationship for AMI and STK
-CH %>%
-  filter(Measure.ID %in% c("MORT_30_HF", "MORT_30_AMI", "MORT_30_STK")) %>%
-  ggplot(aes(Denominator, Score, colour = Measure.ID)) +
-  geom_point() +
-  geom_smooth() 
-
-```
-
-The drop in mortality rate is even more pronounced for AMI.
-
-Let's see what happens when we try to fit a regression to number of cases and mortality rate of AMI and HF.
-
-```{r}
-
-CH_HF <- CH %>%
-  filter(Measure.ID == "MORT_30_HF") %>%
-  na.omit()
-  
-CH_AMI <- CH %>%
-  filter(Measure.ID == "MORT_30_AMI") %>%
-  na.omit()
-
-res_HF <- CH %>%
-  filter(Measure.ID %in% c("MORT_30_HF")) %>%
-  lm(Score ~ Denominator, data = .) %>%
-  tidy(conf.int = TRUE)
-
-res_AMI <- CH %>%
-  filter(Measure.ID %in% c("MORT_30_AMI")) %>%
-  lm(Score ~ Denominator, data = .) %>%
-  tidy(conf.int = TRUE)
-
-kable(res_HF)
-kable(res_AMI)
-```
-
-From the above, we can see that with each additional case of HF, a hospital's rate of mortality decreases between 0.01% to 0.02%. For AMI, the rate of decrease is even higher at 0.01% to 0.04%. 
-
-Another database that has mortality rating is PCIbyhospital. Let's see if we can find the same relationship there.
-
-```{r}
-
-#removing observed mortality rate of 0
-PCI_mort <- PCIbyhospital %>%
-  filter(Procedure == "All PCI", Hospital.Name != "NYS - All Hospitals", Observed.Mortality.Rate >0) %>%
-  select(Number.of.Cases, Observed.Mortality.Rate, Risk.Adjusted.Mortality.Rate)
-
-#plot Risk Adjusted rates
-PCI_mort %>%
-  ggplot(aes(Number.of.Cases, Risk.Adjusted.Mortality.Rate)) +
-  geom_point() +
-  geom_smooth()
-
-#plot observed rate
-PCI_mort %>%
-  ggplot(aes(Number.of.Cases, Observed.Mortality.Rate)) +
-  geom_point() +
-  geom_smooth()
-
-```
-
-We see a fairly sharp drop in mortality rate that plateaus once the number of cases surpasses 500. This appears to apply to both the observed and risk adjusted mortality rate. Let's now fit a regression to number of cases against the two rates.
-
-```{r}
-
-res_Obs <- PCI_mort %>%
-  lm(Risk.Adjusted.Mortality.Rate ~ Number.of.Cases, data = .) %>%
-  tidy(conf.int = TRUE)
-
-res_Adj <- PCI_mort %>%
-  lm(Observed.Mortality.Rate ~ Number.of.Cases, data = .) %>%
-  tidy(conf.int = TRUE)
-
-kable(res_Obs)
-kable(res_Adj)
-```
-
-We see about the same relationship of 0.01%-0.04% decrease in mortality rate for each additional case seen.
-
-Final Data exploration
-
-Now that we have explored the other datasets. Let's add the additional metrics to the HCAHPS dataset and see if we can improve our model.
-
 Combine all the datasets that use Provider ID and Facility ID, respectively
 ```{r}
 
-#first, join HCAHPS with other national datasets (complications)
+#first, join the datasets with providerIDs
 providerID_data <- complicationshospital %>%
-  select(c(Provider.ID, Hospital.Name, Measure.ID, Score)) %>%
-  spread(Measure.ID, Score)
+  select(c(Provider.ID, Hospital.Name, Measure.Name, Measure.ID, Compared.to.National, Denominator, Score, Lower.Estimate, Higher.Estimate, Location))
 
-providerID_data[providerID_data == "Not Available"] = NA
-
-#add number of cases seen in aggregation, as proxy for hospital size
-providerID_data <- complicationshospital %>%
-  select(Provider.ID, Denominator) %>%
-  group_by(Provider.ID) %>%
-  summarise(cases = count(Denominator)) 
-  right_join(providerID_data, by = "Provider.ID")
-           
-providerID_data <- HCAHPS %>%
+providerID_data <- hcahps %>%
+  select(c(Provider.ID, HCAHPS.Measure.ID, HCAHPS.Question, Patient.Survey.Star.Rating, HCAHPS.Answer.Percent, HCAHPS.Linear.Mean.Value)) %>%
   transform(Provider.ID = factor(Provider.ID)) %>%
   right_join(providerID_data, by = "Provider.ID")
 
-```
-
-If we visualize the mortatlity rates, do we observe the same pattern on improved metrics as star ratings increase?
-
-```{r}
-providerID_data %>% 
-  select(H_STAR_RATING, MORT_30_AMI) %>%
-  ggplot(aes(H_STAR_RATING, MORT_30_AMI)) +
-  geom_boxplot()
-
-providerID_data %>% 
-  select(H_STAR_RATING, MORT_30_HF) %>%
-  ggplot(aes(H_STAR_RATING, MORT_30_HF)) +
-  geom_boxplot()
-
-providerID_data %>% 
-  select(H_STAR_RATING, MORT_30_STK) %>%
-  ggplot(aes(H_STAR_RATING, MORT_30_STK)) +
-  geom_boxplot()
-```
-
-It looks like there is no consistent relationship between mortality star ratings. AMI mortality rates only had a slight decline with increased star rating while HF mortality rates appear to actually increase with higher star ratings.
-
-```{r}
-providerID_data %>% 
-  select(H_STAR_RATING, READM_30_AMI) %>%
-  ggplot(aes(H_STAR_RATING, READM_30_AMI)) +
-  geom_boxplot()
-
-providerID_data %>% 
-  select(H_STAR_RATING, READM_30_HF) %>%
-  ggplot(aes(H_STAR_RATING, READM_30_HF)) +
-  geom_boxplot()
-
-providerID_data %>% 
-  select(H_STAR_RATING, READM_30_STK) %>%
-  ggplot(aes(H_STAR_RATING, READM_30_STK)) +
-  geom_boxplot()
-```
-
-
-```{r}
-
+providerID_data <- paymentandvalue %>%
+  select(c(Provider.ID, Payment.measure.ID, Payment.measure.name, Payment.category, Denominator, Payment, Value.of.care.display.ID, Value.of.care.display.name, Value.of.care.category)) %>%
+  right_join(providerID_data, by = "Provider.ID")
 
 #split the coordinates from the location column. we will use it later to help ID hospitals with varying name conventions btw the provider and facility dataset
 providerID_data <- providerID_data %>%
@@ -649,4 +162,144 @@ facilityID_data$Hospital.Name <- sapply(facilityID_data$Hospital.Name, function(
   ifelse(x %in% remapped_names$Facility.Name, remapped_names[facility_orig == x, 2], x)
 })
 
+
+
 ```
+
+Michael's relationship exploration space
+
+I expected cost to improve with the number of cases seen, does it?
+```{r}
+PN <- providerID_data %>%
+  filter(Payment.measure.ID=="PAYM_30_PN") %>%
+  select(Provider.ID, Denominator.x, Payment, Payment.measure.ID) %>%
+  na.omit(PN) %>%
+  filter(Denominator.x != "Not Available")
+PN <- PN[!duplicated(PN), ]
+ggplot(PN, aes(Denominator.x, Payment)) + geom_point()
+
+AMI <- providerID_data %>%
+  filter(Payment.measure.ID=="PAYM_30_AMI") %>%
+  select(Provider.ID, Denominator.x, Payment, Payment.measure.ID) %>%
+  na.omit(AMI) %>%
+  filter(Denominator.x != "Not Available")
+AMI <- AMI[!duplicated(AMI), ]
+ggplot(AMI, aes(Denominator.x, Payment)) + geom_point()
+
+HF <- providerID_data %>%
+  filter(Payment.measure.ID=="PAYM_30_HF") %>%
+  select(Provider.ID, Denominator.x, Payment, Payment.measure.ID) %>%
+  na.omit(HF) %>%
+  filter(Denominator.x != "Not Available")
+HF <- HF[!duplicated(HF), ]
+ggplot(HF, aes(Denominator.x, Payment)) + geom_point()
+```
+No, it does not.
+
+```{r}
+library(scales)
+PCI <- inpatientcost %>% 
+  filter(Year==2010) %>%
+  filter(APR.DRG.Description=="Heart Failure")%>%
+  filter(APR.Severity.of.Illness.Code==1)
+ggplot(PCI, aes(Discharges, Mean.Charge)) + geom_point(color=PCI$APR.Severity.of.Illness.Code) + geom_smooth(method=lm) + scale_x_continuous(trans=log2_trans())
+
+PCI <- inpatientcost %>% 
+  filter(Year==2010) %>%
+  filter(APR.DRG.Description=="Heart Failure")%>%
+  filter(APR.Severity.of.Illness.Code==2)
+ggplot(PCI, aes(Discharges, Mean.Charge)) + geom_point(color=PCI$APR.Severity.of.Illness.Code) + geom_smooth(method=lm) + scale_x_continuous(trans=log2_trans())
+
+PCI <- inpatientcost %>% 
+  filter(Year==2010) %>%
+  filter(APR.DRG.Description=="Heart Failure")%>%
+  filter(APR.Severity.of.Illness.Code==3)
+ggplot(PCI, aes(Discharges, Mean.Charge)) + geom_point(color=PCI$APR.Severity.of.Illness.Code) + geom_smooth(method=lm) + scale_x_continuous(trans=log2_trans())
+```
+Severity does not change costs, neither does number of cases. 
+
+
+```{r}
+#temp <- as.data.frame(unique(providerID_data$Provider.ID))
+#temp2 <- facilityID_data[!duplicated(facilityID_data$Hospital.Name),]
+```
+
+```{r}
+readmissionInfection <- filter(readmission, Measure.Name=="READM-30-COPD-HRRP") %>% 
+  select(Hospital.Name, Provider.Number, Number.of.Readmissions, Number.of.Discharges)
+
+#convert to correct type
+readmissionInfection[, 3] <- as.numeric(as.character( readmissionInfection[, 3] ))
+readmissionInfection[, 4] <- as.numeric(as.character( readmissionInfection[, 4] ))
+ #omit NAs
+na.omit(readmissionInfection)
+
+readmissionInfection <- mutate(readmissionInfection, readmissionRate= `Number.of.Readmissions`/`Number.of.Discharges`)
+
+#time in ED
+temp <- timely %>%
+  filter(Measure.ID=="ED_1b") #Median time from emergency department arrival to emergency department departure for admitted emergency department patients
+
+temp <- left_join(temp, readmissionInfection, by= "Hospital.Name") %>%
+  select(Hospital.Name, Measure.ID, Score, Sample, readmissionRate)
+ggplot(temp, aes(x=temp$readmissionRate, y= temp$Score)) + geom_point() + xlab("Readmission Rate") + ylab("ED Wait Times (for admitted patients)")
+
+```
+
+Readmission VS HCAHPS
+```{r}
+readmitHCAHPS <- left_join(hcahpsSummary, readmissionInfection, by="Hospital.Name")
+#filter by overall score
+readmitHCAHPS %>%
+  filter(HCAHPS.Question=="Summary star rating")%>%
+  ggplot(aes(Patient.Survey.Star.Rating, readmissionRate)) + geom_boxplot()
+```
+
+
+```{r}
+#THIS IS DRIVING ME CRAZY
+#Box plot Scores
+complicationshospital <- as.data.frame(complicationshospital)
+temp <- select(complicationshospital, Hospital.Name, Score, Measure.Name)
+temp$Score <- gsub("Not Available", NA, temp$Score)
+```
+
+Look at some serious complications rankings:
+```{r}
+HFcompScore <- temp %>% filter(Measure.Name=="Heart failure (HF) 30-Day Readmission Rate", rm.na=TRUE) %>% na.omit()
+HFcompScore <- as.data.frame(HFcompScore)
+
+HFcompScore <- HFcompScore[order(HFcompScore$Score),]
+
+BloodClotScore <- temp %>% filter(Measure.Name=="Serious blood clots after surgery", rm.na=TRUE) %>% na.omit()
+BloodClotScore$Score <- as.numeric(BloodClotScore$Score)
+BloodClotScore <- BloodClotScore[order(BloodClotScore$Score),]
+```
+
+Let's look at some patient satisfaction scores:
+```{r}
+hcahpsSummary <- hcahps %>%
+  select(Hospital.Name, HCAHPS.Question, Patient.Survey.Star.Rating) %>%
+  filter(Patient.Survey.Star.Rating != "Not Applicable")
+
+hcahpsRating <- hcahpsSummary %>%
+  filter(HCAHPS.Question=="Summary star rating")
+hcahpsRating <- hcahpsRating[order(hcahpsRating$Patient.Survey.Star.Rating),]
+
+temp2 <- hcahps %>%
+  select(Hospital.Name, HCAHPS.Question, Patient.Survey.Star.Rating) %>%
+  filter(Patient.Survey.Star.Rating != "Not Applicable") %>%
+  filter(HCAHPS.Question=="Recommend hospital - star rating")
+
+hcahpsRating <- left_join(hcahpsRating, temp2, by="Hospital.Name")
+```
+
+```{r}
+HFcompScore
+```
+
+
+Annie's data exploration space
+
+```
+

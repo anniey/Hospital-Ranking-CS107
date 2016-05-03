@@ -12,6 +12,7 @@ library(tidyr)
 library(ggplot2)
 library(broom)
 library(knitr)
+library(caret)
 #cost sets
 paymentandvalue <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/Payment_and_value_of_care_-_Hospital.csv") #national
 inpatientcost <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/Hospital_Inpatient_Cost_Transparency__Beginning_2009.csv") #NYS
@@ -44,6 +45,19 @@ Additiona wrangling of factor to numeric
 ```{r}
 complicationshospital$Denominator <- as.numeric(as.character(complicationshospital$Denominator))
 complicationshospital$Score <- as.numeric(as.character(complicationshospital$Score))
+
+inpatientcost$Mean.Charge <- sub('\\$','', as.character(levels(inpatientcost$Mean.Charge))[inpatientcost$Mean.Charge]) %>%
+  as.numeric()
+
+inpatientcost$Median.Charge <- sub('\\$','', as.character(levels(inpatientcost$Median.Charge))[inpatientcost$Median.Charge]) %>%
+  as.numeric()
+
+#change payment and denominator into numeric
+paymentandvalue$Payment <- sub('\\$','', as.character(levels(paymentandvalue$Payment))[paymentandvalue$Payment]) %>%
+  as.numeric()
+
+paymentandvalue$Denominator <- sub('\\,','', as.character(levels(paymentandvalue$Denominator))[paymentandvalue$Denominator]) %>%
+  as.numeric()
 ```
 
 Michael's relationship exploration space
@@ -252,6 +266,9 @@ Severity<- inpatientcost %>%
 Severity$Mean.Charge <- sub('\\$','', as.character(levels(Severity$Mean.Charge))[Severity$Mean.Charge]) %>%
   as.numeric()
 
+Severity$Median.Charge <- sub('\\$','', as.character(levels(Severity$Mean.Charge))[Severity$Mean.Charge]) %>%
+  as.numeric()
+
 #boxplot of charge by severity
 Severity %>%
   ggplot(aes(APR.Severity.of.Illness.Description, Mean.Charge)) +
@@ -290,14 +307,6 @@ PV <- paymentandvalue %>%
   select(Provider.ID, Denominator, Payment, Payment.measure.ID, Value.of.care.category) %>%
   na.omit() %>%
   filter(Denominator != "Not Available")
-
-#change payment and denominator into numeric
-PV$Payment <- sub('\\$','', as.character(levels(PV$Payment))[PV$Payment]) %>%
-  as.numeric()
-
-PV$Denominator <- sub('\\,','', as.character(levels(PV$Denominator))[PV$Denominator]) %>%
-  as.numeric()
-
 
 #plot cost and number of cases a hospital sees
 ggplot(PV, aes(Denominator, Payment)) + 
@@ -486,16 +495,13 @@ providerID_data <- complicationshospital %>%
   spread(Measure.ID, Score)
 
 providerID_data[providerID_data == "Not Available"] = NA
-
-#add number of cases seen in aggregation, as proxy for hospital size
-providerID_data <- complicationshospital %>%
-  select(Provider.ID, Denominator) %>%
-  group_by(Provider.ID) %>%
-  summarise(cases = count(Denominator)) 
-  right_join(providerID_data, by = "Provider.ID")
            
 providerID_data <- HCAHPS %>%
   transform(Provider.ID = factor(Provider.ID)) %>%
+  right_join(providerID_data, by = "Provider.ID")
+
+providerID_data <- paymentandvalue %>%
+  select(c(Provider.ID, Hospital.name, Payment.measure.ID, Denominator, Payment)) %>%
   right_join(providerID_data, by = "Provider.ID")
 
 ```
@@ -505,6 +511,7 @@ If we visualize the mortatlity rates, do we observe the same pattern on improved
 ```{r}
 providerID_data %>% 
   select(H_STAR_RATING, MORT_30_AMI) %>%
+  unique() %>%
   ggplot(aes(H_STAR_RATING, MORT_30_AMI)) +
   geom_boxplot()
 
@@ -517,46 +524,54 @@ providerID_data %>%
   select(H_STAR_RATING, MORT_30_STK) %>%
   ggplot(aes(H_STAR_RATING, MORT_30_STK)) +
   geom_boxplot()
+
+providerID_data %>% 
+  select(H_STAR_RATING, MORT_30_PN) %>%
+  ggplot(aes(H_STAR_RATING, MORT_30_PN)) +
+  geom_boxplot()
 ```
 
 It looks like there is no consistent relationship between mortality star ratings. AMI mortality rates only had a slight decline with increased star rating while HF mortality rates appear to actually increase with higher star ratings.
 
+What about cost?
+
 ```{r}
 providerID_data %>% 
-  select(H_STAR_RATING, READM_30_AMI) %>%
-  ggplot(aes(H_STAR_RATING, READM_30_AMI)) +
+  filter(Payment.measure.ID == "PAYM_30_AMI") %>%
+  ggplot(aes(H_STAR_RATING, Payment)) +
   geom_boxplot()
 
 providerID_data %>% 
-  select(H_STAR_RATING, READM_30_HF) %>%
-  ggplot(aes(H_STAR_RATING, READM_30_HF)) +
+  filter(Payment.measure.ID == "PAYM_30_HF") %>%
+  ggplot(aes(H_STAR_RATING, Payment)) +
   geom_boxplot()
 
 providerID_data %>% 
-  select(H_STAR_RATING, READM_30_STK) %>%
-  ggplot(aes(H_STAR_RATING, READM_30_STK)) +
+  filter(Payment.measure.ID == "PAYM_30_PN") %>%
+  ggplot(aes(H_STAR_RATING, Payment)) +
   geom_boxplot()
+
+
 ```
 
 
+We will now have to check the other datababse with mortality ratings. In order to do that though, we must first find a way to join our national datasets, which uses provider ID, with our NY state ones, which uses facility ID.
+
+
+First, let us clean our datasets that use the Facility ID
+
 ```{r}
-
-
-#split the coordinates from the location column. we will use it later to help ID hospitals with varying name conventions btw the provider and facility dataset
-providerID_data <- providerID_data %>%
-  separate(Location, into = c("Location", "Location.1"), sep = "\\(")
-  
-#next join all the datasets with facility ID (remove 2008 from hospitalinfection)
+#join all the datasets with facility ID (remove ealier years from hospitalinfection)
 facilityID_data <- hospitalinfection %>%
-  select(-c(Hospital.Name)) %>%
-  filter(Year > 2008) %>%
-  right_join(inpatientcost, by = c("Facility.Id", "Year"))
+  select(c(Facility.Id, Year, Infections.observed, Denominator))
+%>%
+  filter(Year > 2010, Facility.Id > 0)
 
 colnames(PCIbyhospital)[1] <- "Facility.Id"
 colnames(PCIbyhospital)[6] <- "Year"
 
 temp <- PCIbyhospital %>%
-  select(-c(Detailed.Region, Region, Hospital.Name)) %>%
+  select(c(Facility.Id, Year, Number.of.Cases, Risk.Adjusted.Mortality.Rate)) %>%
   transform(Year = as.numeric(levels(Year))[Year]) %>%
   filter(Year %in% c("2010", "2011", "2012"))
 
@@ -566,8 +581,7 @@ facilityID_data <- facilityID_data %>%
 
 #clean case convention and column name
 facilityID_data$Facility.Name <- toupper(facilityID_data$Facility.Name)
-
-colnames(facilityID_data)[13] <- c("Hospital.Name")
+colnames(facilityID_data)[5] <- c("Hospital.Name")
 ```
 
 
@@ -580,12 +594,12 @@ facilityID_data$Hospital.Name <- as.character(facilityID_data$Hospital.Name)
 providerID_data$Hospital.Name <- as.character(providerID_data$Hospital.Name)
 
 FacilityNames <- facilityID_data %>%
-  select(Hospital.Name, Location.1) %>%
+  select(Hospital.Name) %>%
   as.data.frame() %>%
   unique()
 
 HospitalNames <- providerID_data %>%
-  select(Hospital.Name, Location.1) %>%
+  select(Hospital.Name) %>%
   as.data.frame() %>%
   unique()
 
@@ -603,7 +617,7 @@ facilityID_data$Hospital.Name <- gsub(" INC", ", INC", facilityID_data$Hospital.
 
 #rerun the merged datasets
 FacilityNames <- facilityID_data %>%
-  select(Hospital.Name, Location.1) %>%
+  select(Hospital.Name) %>%
   as.data.frame() %>%
   unique()
 
@@ -620,15 +634,6 @@ facilityID_data$Hospital.Name <- gsub("CATSKILL REGIONAL MEDICAL CENTER - G. HER
 #remove division name following -
 facilityID_data$Hospital.Name <- gsub(" - [A-z ]*", "", facilityID_data$Hospital.Name)
 
-#refilter uniques
-FacilityNames <- facilityID_data %>%
-  select(Hospital.Name, Location.1) %>%
-  as.data.frame()
-
-FacilityNames <- FacilityNames[!duplicated(FacilityNames[,1]),]
-
-#merge the tables and find where there is unmerged rows
-ProblemNames <- full_join(FacilityNames, HospitalNames, by = "Hospital.Name")
 
 ```
 
@@ -649,4 +654,39 @@ facilityID_data$Hospital.Name <- sapply(facilityID_data$Hospital.Name, function(
   ifelse(x %in% remapped_names$Facility.Name, remapped_names[facility_orig == x, 2], x)
 })
 
+```
+
+```{r}
+#merge cost information first
+combined_data <- providerID_data %>% 
+  select(Hospital.Name, H_STAR_RATING:H_QUIET_LINEAR_SCORE)
+
+combined_data <- facilityID_data %>% 
+  select(Hospital.Name, Median.Charge, APR.Severity.of.Illness.Code) %>%
+  unique() %>%
+  right_join(combined_data, by = "Hospital.Name") %>%
+  na.omit()
+
+combined_data %>%
+  filter(APR.Severity.of.Illness.Code == 3, Hospital.Name != "ORANGE REGIONAL MEDICAL CENTER" ) %>%
+  ggplot(aes(H_STAR_RATING, Median.Charge)) +
+  geom_boxplot()
+
+```
+
+```{r}
+providerID_data %>% 
+  select(H_STAR_RATING, READM_30_AMI) %>%
+  ggplot(aes(H_STAR_RATING, READM_30_AMI)) +
+  geom_boxplot()
+
+providerID_data %>% 
+  select(H_STAR_RATING, READM_30_HF) %>%
+  ggplot(aes(H_STAR_RATING, READM_30_HF)) +
+  geom_boxplot()
+
+providerID_data %>% 
+  select(H_STAR_RATING, READM_30_STK) %>%
+  ggplot(aes(H_STAR_RATING, READM_30_STK)) +
+  geom_boxplot()
 ```

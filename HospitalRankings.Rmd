@@ -306,17 +306,14 @@ test_set <- slice(HCAHPS_sum, -inTrain$Resample1)
 test_set$Star_Rating  <- factor(test_set$Star_Rating )
 
 #fit the data
-fit <- knn3(Star_Rating ~., data = train_set, k=9)
-f_hat <- predict(fit, newdata = test_set)
-f_hat_max <- apply(f_hat,1,max)
-pred <- apply(f_hat,1,which.max)
+pred <- predict(res_knn, newdata = test_set)
 tab <- table(pred = round(pred), truth = test_set$Star_Rating)
 
 confusionMatrix(tab)$overall["Accuracy"]
   
 ```
 
-From the above, we see that the remaining metrics in HCAHPS has about a 83% accuracy rating in predicting star ratings.
+From the above, we see that the remaining metrics in HCAHPS has about a 90% accuracy rating in predicting star ratings.
 
 Now, we will expand our search outside of the HCAHPS and see if metrics from other databases can help us improve our predicitons. Before we link these new metrics to HCAHPS, we will first explore each dataset and examine some additional hypothesis that would impact patient experience.
 
@@ -920,17 +917,12 @@ test_set <- slice(final_dat, -inTrain$Resample1)
 test_set$Star_Rating  <- factor(test_set$Star_Rating )
 
 #fit the data
-fit <- knn3(Star_Rating ~ ., data = train_set, k=3)
-f_hat <- predict(fit, newdata = test_set)
-f_hat_max <- apply(f_hat,1,max)
-pred <- apply(f_hat,1,which.max)
 
-pred = round(pred)
-truth = test_set$Star_Rating
+pred <- predict(res_knn, newdata = test_set)
+tab <- table(pred = round(pred), truth = test_set$Star_Rating)
 
-u = union(pred, truth)
-t = table(factor(pred, u), factor(truth, u))
-confusionMatrix(t)
+confusionMatrix(tab)$overall["Accuracy"]
+
 ```
 
-Unfortunately, our accuracy decreased to 51.9%. This may be due to overfitting the data.
+

@@ -21,6 +21,7 @@ library(ggplot2)
 library(broom)
 library(knitr)
 library(caret)
+library('corrplot')
 #cost sets
 paymentandvalue <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/Payment_and_value_of_care_-_Hospital.csv") #national
 inpatientcost <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/Hospital_Inpatient_Cost_Transparency__Beginning_2009.csv") #NYS
@@ -53,23 +54,140 @@ readmission <- readmission %>% filter(State=="NY")
 
 Additional wrangling of factor to numeric
 ```{r}
+
 complicationshospital$Denominator <- as.numeric(as.character(complicationshospital$Denominator))
 complicationshospital$Score <- as.numeric(as.character(complicationshospital$Score))
 
 inpatientcost$Mean.Charge <- sub('\\$','', as.character(levels(inpatientcost$Mean.Charge))[inpatientcost$Mean.Charge]) %>%
   as.numeric()
-
 inpatientcost$Median.Charge <- sub('\\$','', as.character(levels(inpatientcost$Median.Charge))[inpatientcost$Median.Charge]) %>%
   as.numeric()
 
-#change payment and denominator into numeric
 paymentandvalue$Payment <- sub('\\$','', as.character(levels(paymentandvalue$Payment))[paymentandvalue$Payment]) %>%
   as.numeric()
-
 paymentandvalue$Denominator <- sub('\\,','', as.character(levels(paymentandvalue$Denominator))[paymentandvalue$Denominator]) %>%
+  as.numeric()
+
+timely$Score <- as.character(levels(timely$Score))[timely$Score] %>%
+  as.numeric()
+
+#change provider ID to numeric
+timely$Provider.ID <- as.character(levels(timely$Provider.ID))[timely$Provider.ID] %>%
+  as.numeric()
+
+complicationshospital$Provider.ID <- as.character(levels(complicationshospital$Provider.ID))[complicationshospital$Provider.ID] %>%
+  as.numeric()
+
+paymentandvalue$Provider.ID <- as.character(levels(paymentandvalue$Provider.ID))[paymentandvalue$Provider.ID] %>%
   as.numeric()
 ```
 
+o verify our findings for mortality, we will now check other databases that contain the same metric. In order to do that though, we must first find a way to join our national datasets, which uses provider ID, with our PCIbyhospital NY dataset, which uses facility ID. There are no common code between the two, so we will have to perform our join using hospital names.
+
+
+```{r}
+
+#use hospital infection naming convention as that is the closest to the provider naming convention
+facilityID_data <- hospitalinfection %>%
+  filter(Facility.Id > 0, Year == 2014 ) %>%
+  select(Facility.Id, Hospital.Name, Infections.observed) %>%
+  group_by(Facility.Id, Hospital.Name) %>%
+  summarise(Infections = sum(Infections.observed) )
+
+#adjust col names of PCI
+colnames(PCIbyhospital)[1] <- "Facility.Id"
+colnames(PCIbyhospital)[6] <- "Year"
+
+#only take risk adjusted mortality rate and the latest year
+facilityID_data <- PCIbyhospital %>%
+  filter(Year == 2011, Procedure == "All PCI") %>%
+  select(c(Facility.Id, Number.of.Cases, Risk.Adjusted.Mortality.Rate)) %>%
+  right_join(facilityID_data, by = "Facility.Id")
+
+
+#clean case convention and column name
+facilityID_data$Hospital.Name <- toupper(facilityID_data$Hospital.Name)
+
+```
+
+
+Now let's try to join the ProviderID dataset with the FacilityID dataset using the Hospital/Facility Name. First, we need to clean up some of the varying naming conventions between the two datasets. We will use ProviderID as the convention given that is the one used by HCAHPS
+
+```{r}
+#find the hospital names that are slightly different between the datasets
+
+facilityID_data$Hospital.Name <- as.character(facilityID_data$Hospital.Name)
+providerID_data$Hospital.Name <- as.character(providerID_data$Hospital.Name)
+
+FacilityNames <- facilityID_data %>%
+  select(Hospital.Name) %>%
+  mutate(Origin = "Facility") %>%
+  as.data.frame() %>%
+  unique()
+
+HospitalNames <- providerID_data %>%
+  select(Hospital.Name) %>%
+  mutate(Origin = "Provider") %>%
+  as.data.frame() %>%
+  unique()
+
+#merge the tables and find where there is unmerged rows
+ProblemNames <- merge(FacilityNames, HospitalNames, by = "Hospital.Name", all = TRUE)
+
+```
+
+
+Quickly scanning the list of merged names, we notice that a common difference in convention between the datasets is the use of "INC" vs ", INC". Let's update FacilityID from "INC" to ", INC".
+```{r}
+
+#Update FacilityID's uses "INC" to match ProviderID's ", INC"
+facilityID_data$Hospital.Name <- gsub(" INC", ", INC", facilityID_data$Hospital.Name)
+
+#rerun the merged datasets
+FacilityNames <- facilityID_data %>%
+  select(Hospital.Name) %>%
+  as.data.frame() %>%
+  unique()
+
+ProblemNames <- merge(FacilityNames, HospitalNames, by = "Hospital.Name", all = TRUE)
+```
+
+It also looks like the facility database has separate IDs for different divisions of a hospital provider. Let's remap all these divisions to the parent provider
+```{r}
+
+#rename Catskill to remove from further cleaning as we don't want to remove the - in this case
+facilityID_data$Hospital.Name <- gsub("CATSKILL REGIONAL MEDICAL CENTER - G. HERMANN SITE", "CATSKILL REGIONAL MEDICAL CENTER G HERMANN SITE", facilityID_data$Hospital.Name)
+
+#remove division name following -
+facilityID_data$Hospital.Name <- gsub(" - [A-z ]*", "", facilityID_data$Hospital.Name)
+
+#rerun the merged datasets
+FacilityNames <- facilityID_data %>%
+  select(Hospital.Name) %>%
+  as.data.frame() %>%
+  unique()
+
+ProblemNames <- merge(FacilityNames, HospitalNames, by = "Hospital.Name", all = TRUE)
+```
+
+We still have a couple more manual changes to make
+
+```{r}
+
+#create table remapping facility name to hospital name
+facility_orig = c("ADIRONDACK MEDICAL CENTER-SARANAC LAKE SITE", "BROOKHAVEN MEMORIAL HOSPITAL MEDICAL CENTER INC", "BROOKLYN HOSPITAL CENTER AT DOWNTOWN CAMPUS", "CATSKILL REGIONAL MEDICAL CENTER - G. HERMANN SITE", "CHAMPLAIN VALLEY PHYSICIANS HOSPITAL MEDICAL CENTER", "CLIFTON-FINE HOSPITAL", "FAXTON-ST LUKES HEALTHCARE ST LUKES DIVISION", "FAXTON-ST LUKES HEALTHCARE FAXTON DIVISION", "JOHN T MATHER MEMORIAL HOSPITAL OF PORT JEFFERSON NEW YORK, INC", "MARGARETVILLE HOSPITAL", "MONTEFIORE", "MONTEFIORE MED CENTER", "MONTEFIORE MEDICAL CENTER& LUCY MOSES DIV", "MOUNT VERNON HOSPITAL", "MOUNT ST MARYS HOSPITAL AND HEALTH CENTER", "NEW YORK COMMUNITY HOSPITAL OF BROOKLYN,, INC", "NEW YORK PRESBYTERIAN HOSPITAL", "RIVER HOSPITAL,, INC.", "ROME MEMORIAL HOSPITAL,, INC", "SCHUYLER HOSPITAL", "SOLDIERS AND SAILORS MEMORIAL HOSPITAL OF YATES, INC", "ST JOHNS EPISCOPAL HOSPITAL SO SHORE", "ST JOSEPHS HOSPITAL", "ST JOSEPHS HOSPITAL HEALTH CENTER", "ST JOSEPH'S MC-ST VINCENTS WESTCHESTER DIVISION", "ST LUKE'S CORNWALL HOSPITAL/NEWBURGH", "ST LUKES ROOSEVELT HOSPITAL", "ST LUKES ROOSEVELT HOSPITAL CENTER", "ST PETERS HOSPITAL", "ST. JOSEPH HOSPITAL", "STATEN ISLAND UNIVERSITY HOSP-NORTH", "STATEN ISLAND UNIVERSITY HOSP-SOUTH", "UNITED HEALTH SERVICES HOSPITALS, INC.", "UNITED MEMORIAL MEDICAL CENTER BANK STREET CAMPUS", "UNITED MEMORIAL MEDICAL CENTER NORTH STREET CAMPUS", "UNIVERSITY HOSPITAL", "UNIVERSITY HOSPITAL OF BROOKLYN", "UNIVERSITY HOSPITAL SUNY HEALTH SCIENCE CENTER", "WOMANS CHRISTIAN ASSOC HOSPITAL", "WOODHULL MEDICAL & MENTAL HEALTH CENTER")
+
+facility_new = c("ADIRONDACK MEDICAL CENTER", "BROOKHAVEN MEMORIAL HOSPITAL MEDICAL CENTER", "BROOKLYN HOSPITAL CENTER", "CATSKILL REGIONAL MEDICAL CENTER - G HERMANN SITE", "CHAMPLAIN VALLEY PHYSICIANS HOSPITAL MEDICAL CTR", "CLIFTON FINE HOSPITAL", "FAXTON-ST LUKE'S HEALTHCARE", "FAXTON-ST LUKE'S HEALTHCARE", "JOHN T MATHER MEMORIAL HOSPITAL OF PORT JEFFERSON", "MARGARETVILLE MEMORIAL HOSPITAL", "MONTEFIORE MEDICAL CENTER", "MONTEFIORE MEDICAL CENTER", "MONTEFIORE MEDICAL CENTER", "MONTEFIORE MOUNT VERNON HOSPITAL", "MOUNT ST MARY'S HOSPITAL AND HEALTH CENTER", "NEW YORK COMMUNITY HOSPITAL OF BROOKLYN, INC.", "NEW YORK-PRESBYTERIAN HOSPITAL", "RIVER HOSPITAL, INC", "ROME MEMORIAL HOSPITAL, INC", "SCHUYLER HOSPITAL, INC", "SOLDIERS AND SAILORS MEMORIAL HOSPITAL OF YATES", "ST JOHN'S EPISCOPAL HOSPITAL AT SOUTH SHORE", "ST JOSEPH'S HOSPITAL, INC", "ST JOSEPH'S HOSPITAL HEALTH CENTER", "ST JOSEPH'S MEDICAL CENTER", "ST LUKE'S CORNWALL HOSPITAL", "ST LUKE'S ROOSEVELT HOSPITAL","ST LUKE'S ROOSEVELT HOSPITAL CENTER", "ST PETER'S HOSPITAL", "ST JOSEPH HOSPITAL", "STATEN ISLAND UNIVERSITY HOSPITAL", "STATEN ISLAND UNIVERSITY HOSPITAL", "UNITED HEALTH SERVICES HOSPITALS, INC", "UNITED MEMORIAL MEDICAL CENTER", "UNITED MEMORIAL MEDICAL CENTER", "UNIVERSITY HOSPITAL (STONY BROOK)", "UNIVERSITY HOSPITAL OF BROOKLYN (DOWNSTATE)", "UNIVERSITY HOSPITAL S U N Y HEALTH SCIENCE CENTER", "WOMAN'S CHRISTIAN ASSOCIATION HOSPITAL", "WOODHULL MEDICAL AND MENTAL HEALTH CENTER")
+
+#renaming table
+remapped_names <- data.frame("Facility Name" = facility_orig, "Provider Name" = facility_new, stringsAsFactors = FALSE)
+
+#rename the hospitals in the facilityID_data
+facilityID_data$Hospital.Name <- sapply(facilityID_data$Hospital.Name, function(x){
+  ifelse(x %in% remapped_names$Facility.Name, remapped_names[facility_orig == x, 2], x)
+})
+
+```
 
 
 #Part 1: Examinig HCAHPS
@@ -94,8 +212,6 @@ HCAHPS <- na.omit(HCAHPS)
 #transform classes
 HCAHPS$HCAHPS.Linear.Mean.Value <- as.numeric(as.character(HCAHPS$HCAHPS.Linear.Mean.Value))
 
-#refactor star rating to account for removed factors
-HCAHPS$H_STAR_RATING <- factor(HCAHPS$H_STAR_RATING)
 
 ```
 
@@ -121,14 +237,23 @@ HCAHPS_sum <- HCAHPS %>%
 #let's make the column names friendly
 colnames(HCAHPS_sum) <- c("Star_Rating", "Cleanliness", "NurseComm", "DoctorComm", "StaffResponsiveness", "PainMmgt.", "MedicationComm.", "Discharge_Info", "Care_Transition", "Overall_Rating", "Quietness")
 
+#turn the star rating into a number
+HCAHPS_sum$Star_Rating <- as.numeric(as.character(HCAHPS_sum$Star_Rating))
+
+#we have to standardize bc star rating is in a different unit
 HCAHPS_dist <- as.matrix(HCAHPS_sum) %>%
+  scale() %>%
   t() %>%
   dist()
 
 heatmap(as.matrix(HCAHPS_dist), margins = c(10,10))
+
+#let's take a look at the correlation too
+M <- cor(HCAHPS_sum)
+corrplot(M, method = "circle", margins = c(1,1)) #plot matrix
 ```
 
-It looks like communication about medicine is the closest to star rating, followed by quietness.
+It looks like nurse communication is the closest to star rating, followed by Medication Communication.
 
 Now, let's see if we can build a knn model from these additional HCAHPS metrics. First, we will need to determine the best K to use.
 
@@ -154,19 +279,19 @@ From the above accuracy graph, it looks like a k of 9 will give us the best rati
 
 ```{r}
 #let's create a model with k = 9
-inTrain <- createDataPartition(y = HCAHPS_sum$H_STAR_RATING, p = 0.8)
+inTrain <- createDataPartition(y = HCAHPS_sum$Star_Rating , p = 0.8)
 train_set <- slice(HCAHPS_sum, inTrain$Resample1)
 test_set <- slice(HCAHPS_sum, -inTrain$Resample1)
 
 #reset factors for test set
-test_set$H_STAR_RATING <- factor(test_set$H_STAR_RATING)
+test_set$Star_Rating  <- factor(test_set$Star_Rating )
 
 #fit the data
-fit <- knn3(H_STAR_RATING~., data = train_set, k=9)
+fit <- knn3(Star_Rating ~., data = train_set, k=9)
 f_hat <- predict(fit, newdata = test_set)
 f_hat_max <- apply(f_hat,1,max)
 pred <- apply(f_hat,1,which.max)
-tab <- table(pred = round(pred), truth = test_set$H_STAR_RATING)
+tab <- table(pred = round(pred), truth = test_set$Star_Rating)
 
 confusionMatrix(tab)$overall["Accuracy"]
   
@@ -178,7 +303,7 @@ Now, we will expand our search outside of the HCAHPS and see if metrics from oth
 
 #Data Exploration of other potential predictors
 
-As we have several other potential predictors in our other datasets, we will limit this preliminary data exploration to just those that have cost and mortality metrics. 
+As we have several other potential predictors in our other datasets, we will limit this preliminary data exploration to just those that have cost and mortality metrics, as these two are by conventional wisdom most likely to impact patient experience. We will examine the relationship that these two measures have with a critical third measure, the hospital case load.
 
 ##Cost
 
@@ -437,7 +562,7 @@ First, we will examine cost.
 #add cost metrics
 providerID_data <- paymentandvalue %>%
   select(c(Provider.ID, Hospital.name, Payment.measure.ID, Denominator, Payment)) %>%
-  right_join(providerID_data, by = "Provider.ID")
+  right_join(HCAHPS, by = "Provider.ID")
 
 providerID_data %>% 
   filter(Payment.measure.ID == "PAYM_30_AMI") %>%
@@ -460,7 +585,7 @@ providerID_data %>%
 
 ```
 
-Interestingly, much like mortality, cost does not appear to have a consistent relationship with star rating. Only cost for pneumonia treatment appears to be decreasing with increase star rating.
+Interestingly, cost does not appear to have a consistent relationship with star rating. Only cost for pneumonia treatment appears to be decreasing with increase star rating.
 
 What about mortality rates?
 
@@ -468,14 +593,13 @@ What about mortality rates?
 
 #select the columns we want relating to mortality
 providerID_data <- complicationshospital %>%
-  select(c(Provider.ID, Hospital.Name, Measure.ID, Score)) %>%
+  select(c(Provider.ID, Hospital.Name, Measure.ID, Denominator, Score)) %>%
   spread(Measure.ID, Score)
 
 providerID_data[providerID_data == "Not Available"] = NA
 
 #join with our HCAHPS dataset   
 providerID_data <- HCAHPS %>%
-  transform(Provider.ID = factor(Provider.ID)) %>%
   right_join(providerID_data, by = "Provider.ID")
 
 #plot our results
@@ -507,114 +631,6 @@ providerID_data %>%
 
 Much like cost, mortality does not appear to have a consistent relationship with star rating. It looks like there is no consistent relationship between mortality and star ratings. AMI mortality rates only had a slight decline with increased star rating. Surprisingly, HF mortality rates appear to actually increase with higher star ratings.
 
-
-We will now have to check the other datababse with mortality ratings. In order to do that though, we must first find a way to join our national datasets, which uses provider ID, with our PCIbyhospital NY dataset, which uses facility ID. There are no common code between the two, so we will have to perform our join using hospital names.
-
-
-```{r}
-
-#use hospital infection naming convention as that is the closest to the provider naming convention
-facilityID_data <- hospitalinfection %>%
-  filter(Facility.Id > 0, Year == 2014 ) %>%
-  select(Facility.Id, Hospital.Name, Infections.observed) %>%
-  group_by(Facility.Id, Hospital.Name) %>%
-  summarise(Infections = sum(Infections.observed) )
-
-#adjust col names of PCI
-colnames(PCIbyhospital)[1] <- "Facility.Id"
-colnames(PCIbyhospital)[6] <- "Year"
-
-#only take risk adjusted mortality rate and the latest year
-facilityID_data <- PCIbyhospital %>%
-  filter(Year == 2011, Procedure == "All PCI") %>%
-  select(c(Facility.Id, Number.of.Cases, Risk.Adjusted.Mortality.Rate)) %>%
-  right_join(facilityID_data, by = "Facility.Id")
-
-
-#clean case convention and column name
-facilityID_data$Hospital.Name <- toupper(facilityID_data$Hospital.Name)
-
-```
-
-
-Now let's try to join the ProviderID dataset with the FacilityID dataset using the Hospital/Facility Name. First, we need to clean up some of the varying naming conventions between the two datasets. We will use ProviderID as the convention given that is the one used by HCAHPS
-
-```{r}
-#find the hospital names that are slightly different between the datasets
-
-facilityID_data$Hospital.Name <- as.character(facilityID_data$Hospital.Name)
-providerID_data$Hospital.Name <- as.character(providerID_data$Hospital.Name)
-
-FacilityNames <- facilityID_data %>%
-  select(Hospital.Name) %>%
-  mutate(Origin = "Facility") %>%
-  as.data.frame() %>%
-  unique()
-
-HospitalNames <- providerID_data %>%
-  select(Hospital.Name) %>%
-  mutate(Origin = "Provider") %>%
-  as.data.frame() %>%
-  unique()
-
-#merge the tables and find where there is unmerged rows
-ProblemNames <- merge(FacilityNames, HospitalNames, by = "Hospital.Name", all = TRUE)
-
-```
-
-
-Quickly scanning the list of merged names, we notice that a common difference in convention between the datasets is the use of "INC" vs ", INC". Let's update FacilityID from "INC" to ", INC".
-```{r}
-
-#Update FacilityID's uses "INC" to match ProviderID's ", INC"
-facilityID_data$Hospital.Name <- gsub(" INC", ", INC", facilityID_data$Hospital.Name)
-
-#rerun the merged datasets
-FacilityNames <- facilityID_data %>%
-  select(Hospital.Name) %>%
-  as.data.frame() %>%
-  unique()
-
-ProblemNames <- merge(FacilityNames, HospitalNames, by = "Hospital.Name", all = TRUE)
-```
-
-It also looks like the facility database has separate IDs for different divisions of a hospital provider. Let's remap all these divisions to the parent provider
-```{r}
-
-#rename Catskill to remove from further cleaning as we don't want to remove the - in this case
-facilityID_data$Hospital.Name <- gsub("CATSKILL REGIONAL MEDICAL CENTER - G. HERMANN SITE", "CATSKILL REGIONAL MEDICAL CENTER G HERMANN SITE", facilityID_data$Hospital.Name)
-
-#remove division name following -
-facilityID_data$Hospital.Name <- gsub(" - [A-z ]*", "", facilityID_data$Hospital.Name)
-
-#rerun the merged datasets
-FacilityNames <- facilityID_data %>%
-  select(Hospital.Name) %>%
-  as.data.frame() %>%
-  unique()
-
-ProblemNames <- merge(FacilityNames, HospitalNames, by = "Hospital.Name", all = TRUE)
-```
-
-We still have a couple more manual changes to make
-
-```{r}
-
-#create table remapping facility name to hospital name
-facility_orig = c("ADIRONDACK MEDICAL CENTER-SARANAC LAKE SITE", "BROOKHAVEN MEMORIAL HOSPITAL MEDICAL CENTER INC", "BROOKLYN HOSPITAL CENTER AT DOWNTOWN CAMPUS", "CATSKILL REGIONAL MEDICAL CENTER - G. HERMANN SITE", "CHAMPLAIN VALLEY PHYSICIANS HOSPITAL MEDICAL CENTER", "CLIFTON-FINE HOSPITAL", "FAXTON-ST LUKES HEALTHCARE ST LUKES DIVISION", "FAXTON-ST LUKES HEALTHCARE FAXTON DIVISION", "JOHN T MATHER MEMORIAL HOSPITAL OF PORT JEFFERSON NEW YORK, INC", "MARGARETVILLE HOSPITAL", "MONTEFIORE", "MONTEFIORE MED CENTER", "MONTEFIORE MEDICAL CENTER& LUCY MOSES DIV", "MOUNT VERNON HOSPITAL", "MOUNT ST MARYS HOSPITAL AND HEALTH CENTER", "NEW YORK COMMUNITY HOSPITAL OF BROOKLYN,, INC", "NEW YORK PRESBYTERIAN HOSPITAL", "RIVER HOSPITAL,, INC.", "ROME MEMORIAL HOSPITAL,, INC", "SCHUYLER HOSPITAL", "SOLDIERS AND SAILORS MEMORIAL HOSPITAL OF YATES, INC", "ST JOHNS EPISCOPAL HOSPITAL SO SHORE", "ST JOSEPHS HOSPITAL", "ST JOSEPHS HOSPITAL HEALTH CENTER", "ST JOSEPH'S MC-ST VINCENTS WESTCHESTER DIVISION", "ST LUKE'S CORNWALL HOSPITAL/NEWBURGH", "ST LUKES ROOSEVELT HOSPITAL", "ST LUKES ROOSEVELT HOSPITAL CENTER", "ST PETERS HOSPITAL", "ST. JOSEPH HOSPITAL", "STATEN ISLAND UNIVERSITY HOSP-NORTH", "STATEN ISLAND UNIVERSITY HOSP-SOUTH", "UNITED HEALTH SERVICES HOSPITALS, INC.", "UNITED MEMORIAL MEDICAL CENTER BANK STREET CAMPUS", "UNITED MEMORIAL MEDICAL CENTER NORTH STREET CAMPUS", "UNIVERSITY HOSPITAL", "UNIVERSITY HOSPITAL OF BROOKLYN", "UNIVERSITY HOSPITAL SUNY HEALTH SCIENCE CENTER", "WOMANS CHRISTIAN ASSOC HOSPITAL", "WOODHULL MEDICAL & MENTAL HEALTH CENTER")
-
-facility_new = c("ADIRONDACK MEDICAL CENTER", "BROOKHAVEN MEMORIAL HOSPITAL MEDICAL CENTER", "BROOKLYN HOSPITAL CENTER", "CATSKILL REGIONAL MEDICAL CENTER - G HERMANN SITE", "CHAMPLAIN VALLEY PHYSICIANS HOSPITAL MEDICAL CTR", "CLIFTON FINE HOSPITAL", "FAXTON-ST LUKE'S HEALTHCARE", "FAXTON-ST LUKE'S HEALTHCARE", "JOHN T MATHER MEMORIAL HOSPITAL OF PORT JEFFERSON", "MARGARETVILLE MEMORIAL HOSPITAL", "MONTEFIORE MEDICAL CENTER", "MONTEFIORE MEDICAL CENTER", "MONTEFIORE MEDICAL CENTER", "MONTEFIORE MOUNT VERNON HOSPITAL", "MOUNT ST MARY'S HOSPITAL AND HEALTH CENTER", "NEW YORK COMMUNITY HOSPITAL OF BROOKLYN, INC.", "NEW YORK-PRESBYTERIAN HOSPITAL", "RIVER HOSPITAL, INC", "ROME MEMORIAL HOSPITAL, INC", "SCHUYLER HOSPITAL, INC", "SOLDIERS AND SAILORS MEMORIAL HOSPITAL OF YATES", "ST JOHN'S EPISCOPAL HOSPITAL AT SOUTH SHORE", "ST JOSEPH'S HOSPITAL, INC", "ST JOSEPH'S HOSPITAL HEALTH CENTER", "ST JOSEPH'S MEDICAL CENTER", "ST LUKE'S CORNWALL HOSPITAL", "ST LUKE'S ROOSEVELT HOSPITAL","ST LUKE'S ROOSEVELT HOSPITAL CENTER", "ST PETER'S HOSPITAL", "ST JOSEPH HOSPITAL", "STATEN ISLAND UNIVERSITY HOSPITAL", "STATEN ISLAND UNIVERSITY HOSPITAL", "UNITED HEALTH SERVICES HOSPITALS, INC", "UNITED MEMORIAL MEDICAL CENTER", "UNITED MEMORIAL MEDICAL CENTER", "UNIVERSITY HOSPITAL (STONY BROOK)", "UNIVERSITY HOSPITAL OF BROOKLYN (DOWNSTATE)", "UNIVERSITY HOSPITAL S U N Y HEALTH SCIENCE CENTER", "WOMAN'S CHRISTIAN ASSOCIATION HOSPITAL", "WOODHULL MEDICAL AND MENTAL HEALTH CENTER")
-
-#renaming table
-remapped_names <- data.frame("Facility Name" = facility_orig, "Provider Name" = facility_new, stringsAsFactors = FALSE)
-
-#rename the hospitals in the facilityID_data
-facilityID_data$Hospital.Name <- sapply(facilityID_data$Hospital.Name, function(x){
-  ifelse(x %in% remapped_names$Facility.Name, remapped_names[facility_orig == x, 2], x)
-})
-
-```
-
 Let us return to our analysis of mortality rates. We will examine whether the risk adjusted mortality rates at hospitals are predictive of star ratings
 
 ```{r}
@@ -632,30 +648,37 @@ combined_data %>%
 
 Based on the above boxplots, it looks like there is no real difference in mortality rate between the star ratings, though there is actually a slight increase in the rate for 4 star hospitals. This is similar to our earlier finding on heart failures.
 
-Finally, to round out our examination of various survival metrics, let us also examine infections.
+Finally, given that we saw some weak relationship between number of cases seen and mortality, let us take a look at its relationship to star rating.
 
 ```{r}
-#merge infection info
-combined_data <- facilityID_data %>% 
-  select(Hospital.Name, Infections) %>%
-  right_join(providerID_data, by = "Hospital.Name")
+combined_data %>%
+  filter(Payment.measure.ID == "PAYM_30_PN") %>%
+  ggplot(aes(H_STAR_RATING, Denominator)) +
+  geom_boxplot() +
+  ggtitle("Number of Cases of Pneumonia vs Star Rating")
 
 combined_data %>%
-  ggplot(aes(H_STAR_RATING, Infections)) +
+  filter(Payment.measure.ID == "PAYM_30_AMI") %>%
+  ggplot(aes(H_STAR_RATING, Denominator)) +
   geom_boxplot() +
-  ggtitle("Total Hospital Infections vs. Star Rating")
+  ggtitle("Number of Cases of AMI vs Star Rating")
+
+combined_data %>%
+  filter(Payment.measure.ID == "PAYM_30_HF") %>%
+  ggplot(aes(H_STAR_RATING, Denominator)) +
+  geom_boxplot() +
+  ggtitle("Number of Cases of HF vs Star Rating")
 
 ```
 
-It looks like infections from hospitals is slightly lower for the higher 4 star hospitals, but not significantly different for the other hospitals.
+There does not appear to be a significant relationship between cases seen and star rating. While it looks like one star hospitals tend to see less cases of pneumonia and AMI, the same cannot be visually seen for heart failure.
 
 ##Other predictors
 
  
+###Readmission
 
-
-#Readmission VS HCAHPS
- We hypothesized that hospitals with higher HCAHPS scores would have lower 30 day readmission rates. 
+We hypothesized that hospitals with higher HCAHPS scores would have lower 30 day readmission rates. 
 
 We analyzed the rate of patients readmitted for a complaint related to their original admission within 30 days of discharge for patients of all disease types:
 ```{r}
@@ -702,33 +725,9 @@ readmitHCAHPS %>%
   ggtitle("Communication about Medicine")
 
 ```
+
 There seems to be a downward trend in readmssion rates as the rating of the discharge instructions and medication communication increase.
 
-
-Look at some serious complications complications:
-```{r}
-HFcompScore <- temp %>% filter(Measure.Name=="Heart failure (HF) 30-Day Readmission Rate", rm.na=TRUE) %>% na.omit()
-HFcompScore <- as.data.frame(HFcompScore)
-
-HFcompScore <- HFcompScore[order(HFcompScore$Score),]
-
-BloodClotScore <- temp %>% filter(Measure.Name=="Serious blood clots after surgery", rm.na=TRUE) %>% na.omit()
-BloodClotScore$Score <- as.numeric(BloodClotScore$Score)
-BloodClotScore <- BloodClotScore[order(BloodClotScore$Score),]
-
-names(HFcompScore)[2] <- "HF.Score"
-names(BloodClotScore)[2] <- "Clot.Score"
-
-CompsHCAHPS <- left_join(HFcompScore, BloodClotScore, by= "Hospital.Name") %>%
-  select(Hospital.Name, HF.Score, Clot.Score)
-CompsHCAHPS <- left_join(CompsHCAHPS, hcahpsRating, by= "Hospital.Name")
-CompsHCAHPS <- na.omit(CompsHCAHPS)
-
-CompsHCAHPS %>%
-  ggplot(aes(Summary.Rating, Clot.Score)) + geom_boxplot() + xlab("HCAHPS Score") + ylab("Clot Rate") + ggtitle("Clots")
-```
-
-There is no effect of serious side effects--in the example: blood clots--on HCAHPS Scores. It doesn't seem that people are likely to change their evaluation of the care based on complications.
 
 ###Time
 
@@ -739,31 +738,151 @@ Time spent in the emergency department is more commonly being looked at as an in
 temp <- timely %>%
   filter(Measure.ID=="ED_1b") #Median time from emergency department arrival to emergency department departure for admitted emergency department patients
 
-temp <- left_join(temp, readmissionInfection, by= "Hospital.Name") %>%
-  select(Hospital.Name, Measure.ID, Score, Sample, readmissionRate)
-ggplot(temp, aes(x=temp$readmissionRate, y= temp$Score)) + geom_point() + xlab("Readmission Rate") + ylab("ED Wait Times (for admitted patients)")
+#add to the readmitHCAHPS
+temp <- left_join(temp, readmitHCAHPS, by= "Provider.ID") %>%
+  select(Provider.ID, Measure.ID, Score, Sample, readmissionRate, H_STAR_RATING)
 
-temp <- left_join(temp, hcahpsSummary, by="Hospital.Name")
-temp$Score <- gsub("Not Available", NA, temp$Score)
-temp$Score <- as.numeric(as.character(temp$Score))
+#plot the trend against readmission
+ggplot(temp, aes(x=temp$readmissionRate, y= temp$Score)) + 
+  geom_point() + 
+  geom_smooth() +
+  xlab("Readmission Rate") + 
+  ylab("ED Wait Times (for admitted patients)")
 
-temp %>%
-  na.omit() %>%
-  ggplot(aes(Patient.Survey.Star.Rating, Score)) + geom_boxplot() + xlab("HCAHPS Score") + ylab("ED Wait Time")
+#plot the trend against readmission
+ggplot(temp, aes(H_STAR_RATING, temp$Score)) + 
+  geom_boxplot() +
+  xlab("Readmission Rate") + 
+  ylab("ED Wait Times (for admitted patients)")
+
 ``` 
 
-It appears that as the hospitals with lower HCAHPS scores tended to have higher ED wait times.
+It appears that as the hospitals with lower HCAHPS star ratings tended to have higher ED wait times.
+
+
+##Complications
 
 ```{r}
+BloodClotScore <- complicationshospital %>% 
+  filter(Measure.Name=="Serious blood clots after surgery", rm.na=TRUE)
+
+BloodClotScore$Score <- as.numeric(BloodClotScore$Score)
+BloodClotScore <- BloodClotScore[order(BloodClotScore$Score),]
+
+names(BloodClotScore)[13] <- "Clot.Score"
+
+CompsHCAHPS <- left_join(BloodClotScore, HCAHPS, by= "Provider.ID") %>%
+  na.omit()
+
+CompsHCAHPS %>%
+  ggplot(aes(H_STAR_RATING, Clot.Score)) + 
+  geom_boxplot() + 
+  xlab("HCAHPS Score") + 
+  ylab("Clot Rate") + 
+  ggtitle("Clots")
+
 
 ```
 
+HCAHPS star ratings do not appear to have dramatically different rates of serious complications like blood clot. It doesn't seem that people are likely to change their evaluation of the care based on complications.
+
+
+Finally, to round out our examination of various survival metrics, let us also examine infections.
+
+```{r}
+#merge infection info
+combined_data <- facilityID_data %>% 
+  select(Hospital.Name, Infections) %>%
+  right_join(providerID_data, by = "Hospital.Name")
+
+combined_data %>%
+  ggplot(aes(H_STAR_RATING, Infections)) +
+  geom_boxplot() +
+  ggtitle("Total Hospital Infections vs. Star Rating")
+
+```
+
+It looks like infections from hospitals is slightly lower for the higher 4 star hospitals, but not significantly different for the other hospitals.
 
 
 ##Aggregating the findings
 
-From all of the analysis above, 
+From all of the analysis above, it looks like the best candidates for additional predictors of HCAHPS star rating is readmission, time to emergency room, and payments for pneumonia.
 
 ```{r}
+#create the final dataset
+final_dat <- paymentandvalue %>%
+  filter(Payment.measure.ID == "PAYM_30_PN") %>%
+  select(Provider.ID, Payment) %>%
+  right_join(readmitHCAHPS, by = "Provider.ID") %>%
+  select(-c(Number.of.Discharges, Number.of.Readmissions))
 
+final_dat <- temp %>%
+  select(Provider.ID, Score) %>%
+  right_join(final_dat, by = "Provider.ID") %>%
+  select(-c(Provider.ID))
+
+#changing the order of magnitude for payment, ER wait, readmission rate
+final_dat <- final_dat %>%
+  transform(Payment = Payment / 100, Score = Score / 10, readmissionRate = readmissionRate * 100)
+
+#let's make the column names friendly
+colnames(final_dat) <- c("ER_Wait", "Pay_PN", "Star_Rating", "Cleanliness", "NurseComm", "DoctorComm", "StaffResponsiveness", "PainMmgt.", "MedicationComm.", "Discharge_Info", "Care_Transition", "Overall_Rating", "Quietness", "Readmission Rate")
+
+#turn the star rating into a number
+final_dat$Star_Rating <- as.numeric(as.character(final_dat$Star_Rating))
+
+#we have to standardize bc star rating is in a different unit
+final_dat_dist <- as.matrix(final_dat) %>%
+  scale() %>%
+  t() %>%
+  dist()
+
+heatmap(as.matrix(final_dat_dist), margins = c(10,10))
+
+```
+
+
+Now, let's revist our knn model
+
+```{r}
+#let's find the best k
+set.seed(1)
+final_dat <- scale(final_dat)
+
+control <- trainControl(method='cv', number=10, p=.8)
+res_knn <- train(Star_Rating ~ .,
+             data = final_dat,
+             method = "knn",
+             trControl = control,
+             tuneLength = 1,
+             tuneGrid=data.frame(k=seq(1,15,1)),
+             metric="Accuracy")
+
+res_knn$results %>% 
+  ggplot(aes(k, Accuracy, ymin= Accuracy - AccuracySD, 
+             ymax = Accuracy + AccuracySD)) +
+  geom_point() + geom_errorbar()
+```
+
+From the above accuracy graph, it looks like a k of 9 will give us the best ratings.
+
+```{r}
+#let's create a model with k = 9
+inTrain <- createDataPartition(y = HCAHPS_sum$Star_Rating , p = 0.8)
+train_set <- slice(HCAHPS_sum, inTrain$Resample1)
+test_set <- slice(HCAHPS_sum, -inTrain$Resample1)
+
+#reset factors for test set
+test_set$Star_Rating  <- factor(test_set$Star_Rating )
+
+#fit the data
+fit <- knn3(Star_Rating ~., data = train_set, k=9)
+f_hat <- predict(fit, newdata = test_set)
+f_hat_max <- apply(f_hat,1,max)
+pred <- apply(f_hat,1,which.max)
+tab <- table(pred = round(pred), truth = test_set$Star_Rating)
+
+confusionMatrix(tab)$overall["Accuracy"]
+  
 ```

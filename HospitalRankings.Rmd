@@ -264,7 +264,7 @@ heatmap(as.matrix(HCAHPS_dist), margins = c(10,10))
 
 #let's take a look at the correlation too
 M <- cor(HCAHPS_sum)
-corrplot(M, method = "circle", margins = c(1,1)) #plot matrix
+corrplot(M, method = "circle") #plot matrix
 ```
 
 It looks like nurse communication is the closest to star rating, followed by Medication Communication.
@@ -855,6 +855,10 @@ final_dat <- readmitHCAHPS %>%
   select(c(Provider.ID, readmissionRate)) %>%
   right_join(final_dat, by = "Provider.ID")
 
+final_dat <- mort %>%
+  select(c(Provider.ID, MORT_30_HF)) %>%
+  right_join(final_dat, by = "Provider.ID")
+
 final_dat <- temp %>%
   select(Provider.ID, Score) %>%
   right_join(final_dat, by = "Provider.ID") %>%
@@ -862,7 +866,7 @@ final_dat <- temp %>%
   na.omit()
 
 #let's make the column names friendly
-colnames(final_dat) <- c("ER_Wait", "Readmission", "Payment", "Star_Rating", "Cleanliness", "NurseComm", "DoctorComm", "StaffResponsiveness", "PainMmgt.", "MedicationComm.", "Discharge_Info", "Care_Transition", "Overall_Rating", "Quietness")
+colnames(final_dat) <- c("ER_Wait", "HF_Mort", "Readmission", "Payment", "Star_Rating", "Cleanliness", "NurseComm", "DoctorComm", "StaffResponsiveness", "PainMmgt.", "MedicationComm.", "Discharge_Info", "Care_Transition", "Overall_Rating", "Quietness")
 
 #turn the star rating into a number
 final_dat$Star_Rating <- as.numeric(as.character(final_dat$Star_Rating))
@@ -872,6 +876,8 @@ final_dat_dist <- as.matrix(final_dat) %>%
   scale() %>%
   t() %>%
   dist()
+
+final_dat <- subset(final_dat, select=c(Star_Rating,ER_Wait:Quietness))
 
 heatmap(as.matrix(final_dat_dist), margins = c(10,10))
 
@@ -901,4 +907,27 @@ res_knn$results %>%
 res_knn
 ```
 
-Unfortunately, it looks like none of the other metrics we choose has helped us improve our ratings.
+It looks like the best k value is 3.
+
+```{r}
+set.seed(1)
+#let's create a model with k = 3
+inTrain <- createDataPartition(y = final_dat$Star_Rating , p = 0.8)
+train_set <- slice(final_dat, inTrain$Resample1)
+test_set <- slice(final_dat, -inTrain$Resample1)
+
+#reset factors for test set
+test_set$Star_Rating  <- factor(test_set$Star_Rating )
+
+#fit the data
+fit <- knn3(Star_Rating ~ ., data = train_set, k=3)
+f_hat <- predict(fit, newdata = test_set)
+f_hat_max <- apply(f_hat,1,max)
+pred <- apply(f_hat,1,which.max)
+tab <- table(pred = round(pred), truth = test_set$Star_Rating)
+
+confusionMatrix(tab)$overall["Accuracy"]
+  
+```
+
+

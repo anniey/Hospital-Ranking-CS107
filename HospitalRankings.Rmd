@@ -59,95 +59,6 @@ paymentandvalue$Denominator <- sub('\\,','', as.character(levels(paymentandvalue
   as.numeric()
 ```
 
-Michael's relationship exploration space
-
-
-```{r}
-library(scales)
-PCI <- inpatientcost %>% 
-  filter(Year==2010) %>%
-  filter(APR.DRG.Description=="Heart Failure")%>%
-  filter(APR.Severity.of.Illness.Code==1)
-ggplot(PCI, aes(Discharges, Mean.Charge)) + geom_point(color=PCI$APR.Severity.of.Illness.Code) + geom_smooth(method=lm) + scale_x_continuous(trans=log2_trans())
-
-PCI <- inpatientcost %>% 
-  filter(Year==2010) %>%
-  filter(APR.DRG.Description=="Heart Failure")%>%
-  filter(APR.Severity.of.Illness.Code==2)
-ggplot(PCI, aes(Discharges, Mean.Charge)) + geom_point(color=PCI$APR.Severity.of.Illness.Code) + geom_smooth(method=lm) + scale_x_continuous(trans=log2_trans())
-
-PCI <- inpatientcost %>% 
-  filter(Year==2010) %>%
-  filter(APR.DRG.Description=="Heart Failure")%>%
-  filter(APR.Severity.of.Illness.Code==3)
-ggplot(PCI, aes(Discharges, Mean.Charge)) + geom_point(color=PCI$APR.Severity.of.Illness.Code) + geom_smooth(method=lm) + scale_x_continuous(trans=log2_trans())
-```
-Severity does not change costs, neither does number of cases. 
- 
-
-```{r}
-readmissionInfection <- filter(readmission, Measure.Name=="READM-30-COPD-HRRP") %>% 
-  select(Hospital.Name, Provider.Number, Number.of.Readmissions, Number.of.Discharges)
-
-#convert to correct type
-readmissionInfection[, 3] <- as.numeric(as.character( readmissionInfection[, 3] ))
-readmissionInfection[, 4] <- as.numeric(as.character( readmissionInfection[, 4] ))
- #omit NAs
-na.omit(readmissionInfection)
-
-readmissionInfection <- mutate(readmissionInfection, readmissionRate= Number.of.Readmissions/Number.of.Discharges)
-
-#time in ED
-temp <- timely %>%
-  filter(Measure.ID=="ED_1b") #Median time from emergency department arrival to emergency department departure for admitted emergency department patients
-
-temp <- left_join(temp, readmissionInfection, by= "Hospital.Name") %>%
-  select(Hospital.Name, Measure.ID, Score, Sample, readmissionRate)
-ggplot(temp, aes(x=temp$readmissionRate, y= temp$Score)) + geom_point() + xlab("Readmission Rate") + ylab("ED Wait Times (for admitted patients)")
-
-```
-
-Readmission VS HCAHPS
-
-
-Look at some serious complications rankings:
-```{r}
-HFcompScore <- temp %>% filter(Measure.Name=="Heart failure (HF) 30-Day Readmission Rate", rm.na=TRUE) %>% na.omit()
-HFcompScore <- as.data.frame(HFcompScore)
-
-HFcompScore <- HFcompScore[order(HFcompScore$Score),]
-
-BloodClotScore <- temp %>% filter(Measure.Name=="Serious blood clots after surgery", rm.na=TRUE) %>% na.omit()
-BloodClotScore$Score <- as.numeric(BloodClotScore$Score)
-BloodClotScore <- BloodClotScore[order(BloodClotScore$Score),]
-```
-
-Let's look at some patient satisfaction scores:
-```{r}
-hcahpsSummary <- hcahps %>%
-  select(Hospital.Name, HCAHPS.Question, Patient.Survey.Star.Rating) %>%
-  filter(Patient.Survey.Star.Rating != "Not Applicable")
-
-hcahpsRating <- hcahpsSummary %>%
-  filter(HCAHPS.Question=="Summary star rating")
-hcahpsRating <- hcahpsRating[order(hcahpsRating$Patient.Survey.Star.Rating),]
-
-temp2 <- hcahps %>%
-  select(Hospital.Name, HCAHPS.Question, Patient.Survey.Star.Rating) %>%
-  filter(Patient.Survey.Star.Rating != "Not Applicable") %>%
-  filter(HCAHPS.Question=="Recommend hospital - star rating")
-
-hcahpsRating <- left_join(hcahpsRating, temp2, by="Hospital.Name")
-```
-
-```{r}
-readmitHCAHPS <- left_join(hcahpsSummary, readmissionInfection, by="Hospital.Name")
-#filter by overall score
-readmitHCAHPS %>%
-  filter(HCAHPS.Question=="Summary star rating")%>%
-  ggplot(aes(Patient.Survey.Star.Rating, readmissionRate)) + geom_boxplot()
-```
-
 The purpose of this project is to examine the Hospital Consumer Assessment of Healthcare Providers and Systems (HCAHPS) and related medical metrics that capture patient's overall experience at a hospital. 
 
 As part of the Affordable Care Act, the government issued the creation of a national, standardized, publicly reported survey of patients' perspectives of hospital care (i.e. the HCAHPS). The HCAHPS contains numerous qualitative measures of a patient's experience including cleanliness of the hospital, pain management, effective communication by doctors and nurses, etc. The most visible and highly focused of these metrics are the star ratings.
@@ -293,7 +204,7 @@ Severity %>%
 Unfortunately, it looks like there is no relationship between number of patients seen and cost of treatment. This suggests that, contrary to expectation, hospitals that see more cases of a certain disorder/disease may not actually have an advantage in scalibility to reduce costs.
 
 
-Part 2: Mortality
+Part 3: Mortality
 
 The next potential predictor we will examine is mortality.
 
@@ -586,6 +497,90 @@ providerID_data %>%
 
 Much like cost, mortality does not appear to have a consistent relationship with star rating. It looks like there is no consistent relationship between mortality and star ratings. AMI mortality rates only had a slight decline with increased star rating. Surprisingly, HF mortality rates appear to actually increase with higher star ratings.
 
+ime spent in the emergency department is more commonly being looked at as an indicator of the overall patient expirience. We looked at the time it took hospitals to move admitted patients out of the ED to their rooms and compared it with HCAHPS score.
+```{r}
+#time in ED
+temp <- timely %>%
+  filter(Measure.ID=="ED_1b") #Median time from emergency department arrival to emergency department departure for admitted emergency department patients
+
+temp <- left_join(temp, readmissionInfection, by= "Hospital.Name") %>%
+  select(Hospital.Name, Measure.ID, Score, Sample, readmissionRate)
+ggplot(temp, aes(x=temp$readmissionRate, y= temp$Score)) + geom_point() + xlab("Readmission Rate") + ylab("ED Wait Times (for admitted patients)")
+
+temp <- left_join(temp, hcahpsSummary, by="Hospital.Name")
+temp$Score <- gsub("Not Available", NA, temp$Score)
+temp$Score <- as.numeric(as.character(temp$Score))
+temp %>%
+  na.omit() %>%
+  ggplot(aes(Patient.Survey.Star.Rating, Score)) + geom_boxplot() + xlab("HCAHPS Score") + ylab("ED Wait Time")
+``` 
+
+It appears that as the hospitals with lower HCAHPS scores tended to have higher ED wait times. 
+
+
+#Readmission VS HCAHPS
+HCAHPS Scores are based on surveys sent to patients by the Centers for Medicaid and Medicare (CMS). The highest rating a hospital can get is 5 stars and the lowest is 1 star. A random sampling of patients receive surveys from CMS. The survey questions are primarily centered around patient satisfaction and quality of service in the hospital. Most of the questions are about the patients expirience with his or her providers such as: how did your doctor communicate with you? Did the staff explain the medications you were given? Was your pain well managed?
+
+Higher HCAHPS scores may be in indication that the staff communicates effectively and that patients go home with a better understand of how to take care of themselves. We hypothesized that hospitals with higher HCAHPS scores would have lower 30 day readmission rates. 
+
+We analyzed the rate of patients readmitted for a complaint related to their original admission within 30 days of discharge for patients of all disease types:
+```{r}
+readmissionInfection <- filter(readmission, Measure.Name=="READM-30-COPD-HRRP") %>% 
+  select(Hospital.Name, Provider.Number, Number.of.Readmissions, Number.of.Discharges)
+
+#convert to correct type
+readmissionInfection[, 3] <- as.numeric(as.character( readmissionInfection[, 3] ))
+readmissionInfection[, 4] <- as.numeric(as.character( readmissionInfection[, 4] ))
+readmissionInfection <- na.omit(readmissionInfection)
+
+readmissionInfection <- mutate(readmissionInfection, readmissionRate= Number.of.Readmissions/Number.of.Discharges)
+
+readmitHCAHPS <- left_join(hcahpsSummary, readmissionInfection, by="Hospital.Name")
+#filter by overall score
+readmitHCAHPS %>%
+  filter(HCAHPS.Question=="Summary star rating")%>%
+  ggplot(aes(Patient.Survey.Star.Rating, readmissionRate)) + geom_boxplot() + xlab("HCAHPS Score") + ylab("Readmission Rate")
+```
+
+Indeed, there seems to be a trend towards lower 30 readmission rates for hospitals with higher HCAHPS scores. 
+
+If our theory is, indeed, true then we would expect that patients with lower readmission rates would rate their discharge instructions and communication about medicines highly:
+```{r}
+readmitHCAHPS %>%
+  filter(HCAHPS.Question=="Discharge information - star rating") %>%
+  ggplot(aes(Patient.Survey.Star.Rating, readmissionRate)) + geom_boxplot() + xlab("Discharge Instructions Score") + ylab("Readmission Rate")+ ggtitle("Discharge Information")
+
+readmitHCAHPS %>%
+  filter(HCAHPS.Question=="Communication about medicines - star rating") %>%
+  ggplot(aes(Patient.Survey.Star.Rating, readmissionRate)) + geom_boxplot() + xlab("Communication about Medicine Score") + ylab("Readmission Rate") + ggtitle("Communication about Medicine")
+
+```
+There seems to be a downward trend in readmssion rates as the rating of the discharge instructions and medication communication increase.
+
+
+Look at some serious complications complications:
+```{r}
+HFcompScore <- temp %>% filter(Measure.Name=="Heart failure (HF) 30-Day Readmission Rate", rm.na=TRUE) %>% na.omit()
+HFcompScore <- as.data.frame(HFcompScore)
+
+HFcompScore <- HFcompScore[order(HFcompScore$Score),]
+
+BloodClotScore <- temp %>% filter(Measure.Name=="Serious blood clots after surgery", rm.na=TRUE) %>% na.omit()
+BloodClotScore$Score <- as.numeric(BloodClotScore$Score)
+BloodClotScore <- BloodClotScore[order(BloodClotScore$Score),]
+
+names(HFcompScore)[2] <- "HF.Score"
+names(BloodClotScore)[2] <- "Clot.Score"
+
+CompsHCAHPS <- left_join(HFcompScore, BloodClotScore, by= "Hospital.Name") %>%
+  select(Hospital.Name, HF.Score, Clot.Score)
+CompsHCAHPS <- left_join(CompsHCAHPS, hcahpsRating, by= "Hospital.Name")
+CompsHCAHPS <- na.omit(CompsHCAHPS)
+
+CompsHCAHPS %>%
+  ggplot(aes(Summary.Rating, Clot.Score)) + geom_boxplot() + xlab("HCAHPS Score") + ylab("Clot Rate") + ggtitle("Clots")
+```
+There is no effect of serious side effects--in the example: blood clots--on HCAHPS Scores. It doesn't seem that people are likely to change their evaluation of the care based on complications.
 
 We will now have to check the other datababse with mortality ratings. In order to do that though, we must first find a way to join our national datasets, which uses provider ID, with our PCIbyhospital NY dataset, which uses facility ID. There are no common code between the two, so we will have to perform our join using hospital names.
 
@@ -597,9 +592,9 @@ colnames(PCIbyhospital)[6] <- "Year"
 
 #only take risk adjusted mortality rate and the latest year
 facilityID_data <- PCIbyhospital %>%
-  select(c(Facility.Id, Hospital.Name, Year, Number.of.Cases, Risk.Adjusted.Mortality.Rate)) %>%
-  transform(Year = as.numeric(levels(Year))[Year]) %>%
-  filter(Year == 2011)
+  filter(Year == 2011, Procedure == "All PCI") %>%
+  select(c(Facility.Id, Hospital.Name, Number.of.Cases, Risk.Adjusted.Mortality.Rate))
+
 
 #clean case convention and column name
 facilityID_data$Hospital.Name <- toupper(facilityID_data$Hospital.Name)
@@ -686,15 +681,13 @@ facilityID_data$Hospital.Name <- sapply(facilityID_data$Hospital.Name, function(
 ```
 
 ```{r}
-#merge cost information first
+#merge mortality info
 combined_data <- providerID_data %>% 
   select(Hospital.Name, H_STAR_RATING:H_QUIET_LINEAR_SCORE)
 
 combined_data <- facilityID_data %>% 
-  select(Hospital.Name, Median.Charge, APR.Severity.of.Illness.Code) %>%
-  unique() %>%
-  right_join(combined_data, by = "Hospital.Name") %>%
-  na.omit()
+  select(Hospital.Name, Number.of.Cases, Risk.Adjusted.Mortality.Rate) %>%
+  right_join(combined_data, by = "Hospital.Name")
 
 combined_data %>%
   filter(APR.Severity.of.Illness.Code == 3, Hospital.Name != "ORANGE REGIONAL MEDICAL CENTER" ) %>%

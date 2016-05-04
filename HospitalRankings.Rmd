@@ -90,6 +90,7 @@ ggplot(HF, aes(Denominator.x, Payment)) + geom_point()
 ```
 No, it does not.
 
+
 ```{r}
 library(scales)
 PCI <- inpatientcost %>% 
@@ -111,12 +112,7 @@ PCI <- inpatientcost %>%
 ggplot(PCI, aes(Discharges, Mean.Charge)) + geom_point(color=PCI$APR.Severity.of.Illness.Code) + geom_smooth(method=lm) + scale_x_continuous(trans=log2_trans())
 ```
 Severity does not change costs, neither does number of cases. 
-
-
-```{r}
-#temp <- as.data.frame(unique(providerID_data$Provider.ID))
-#temp2 <- facilityID_data[!duplicated(facilityID_data$Hospital.Name),]
-```
+ 
 
 ```{r}
 readmissionInfection <- filter(readmission, Measure.Name=="READM-30-COPD-HRRP") %>% 
@@ -128,7 +124,7 @@ readmissionInfection[, 4] <- as.numeric(as.character( readmissionInfection[, 4] 
  #omit NAs
 na.omit(readmissionInfection)
 
-readmissionInfection <- mutate(readmissionInfection, readmissionRate= `Number.of.Readmissions`/`Number.of.Discharges`)
+readmissionInfection <- mutate(readmissionInfection, readmissionRate= Number.of.Readmissions/Number.of.Discharges)
 
 #time in ED
 temp <- timely %>%
@@ -137,16 +133,46 @@ temp <- timely %>%
 temp <- left_join(temp, readmissionInfection, by= "Hospital.Name") %>%
   select(Hospital.Name, Measure.ID, Score, Sample, readmissionRate)
 ggplot(temp, aes(x=temp$readmissionRate, y= temp$Score)) + geom_point() + xlab("Readmission Rate") + ylab("ED Wait Times (for admitted patients)")
+
 ```
 
-
-
+Readmission VS HCAHPS
 ```{r}
-#THIS IS DRIVING ME CRAZY
-#Box plot Scores
-complicationshospital <- as.data.frame(complicationshospital)
-temp <- select(complicationshospital, Hospital.Name, Score, Measure.Name)
-temp <- temp$Score %>% gsub("Not Available", NA)
+readmitHCAHPS <- left_join(hcahpsSummary, readmissionInfection, by="Hospital.Name")
+#filter by overall score
+readmitHCAHPS %>%
+  filter(HCAHPS.Question=="Summary star rating")%>%
+  ggplot(aes(Patient.Survey.Star.Rating, readmissionRate)) + geom_boxplot()
+```
+
+Look at some serious complications rankings:
+```{r}
+HFcompScore <- temp %>% filter(Measure.Name=="Heart failure (HF) 30-Day Readmission Rate", rm.na=TRUE) %>% na.omit()
+HFcompScore <- as.data.frame(HFcompScore)
+
+HFcompScore <- HFcompScore[order(HFcompScore$Score),]
+
+BloodClotScore <- temp %>% filter(Measure.Name=="Serious blood clots after surgery", rm.na=TRUE) %>% na.omit()
+BloodClotScore$Score <- as.numeric(BloodClotScore$Score)
+BloodClotScore <- BloodClotScore[order(BloodClotScore$Score),]
+```
+
+Let's look at some patient satisfaction scores:
+```{r}
+hcahpsSummary <- hcahps %>%
+  select(Hospital.Name, HCAHPS.Question, Patient.Survey.Star.Rating) %>%
+  filter(Patient.Survey.Star.Rating != "Not Applicable")
+
+hcahpsRating <- hcahpsSummary %>%
+  filter(HCAHPS.Question=="Summary star rating")
+hcahpsRating <- hcahpsRating[order(hcahpsRating$Patient.Survey.Star.Rating),]
+
+temp2 <- hcahps %>%
+  select(Hospital.Name, HCAHPS.Question, Patient.Survey.Star.Rating) %>%
+  filter(Patient.Survey.Star.Rating != "Not Applicable") %>%
+  filter(HCAHPS.Question=="Recommend hospital - star rating")
+
+hcahpsRating <- left_join(hcahpsRating, temp2, by="Hospital.Name")
 ```
 
 

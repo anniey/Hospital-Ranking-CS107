@@ -426,8 +426,7 @@ First, we will examine cost.
 ```{r}
 #add cost metrics
 providerID_data <- paymentandvalue %>%
-  select(c(Provider.ID, Hospital.name, Payment.measure.ID, Denominator, Payment)) %>%
-  right_join(providerID_data, by = "Provider.ID")
+  select(Provider.ID, Hospital.name, Payment.measure.ID, Denominator, Payment)
 
 providerID_data %>% 
   filter(Payment.measure.ID == "PAYM_30_AMI") %>%

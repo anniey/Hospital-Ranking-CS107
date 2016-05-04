@@ -362,28 +362,47 @@ As we have several other potential predictors in our other datasets, we will lim
 
 ##Cost
 
-First, let us sanity check this dataset and verify that cost is higher for more severe treatments.
+We will start our cost examination with the inpatientcost dataset. This dataset allows us to look at cost, controlling for the severity of the injury/proceduce. First, let us sanity check this dataset and verify that cost is higher for more severe treatments.
 
 ```{r}
 Severity<- inpatientcost %>% 
   filter(APR.DRG.Description=="Heart Failure")
 
+#reorder the factors from minor to extreme
+Severity$APR.Severity.of.Illness.Description <- factor(Severity$APR.Severity.of.Illness.Description, levels = c("Minor", "Moderate", "Major", "Extreme"), ordered = TRUE)
+  
+
 #boxplot of charge by severity
 Severity %>%
   ggplot(aes(APR.Severity.of.Illness.Description, Mean.Charge)) +
-  geom_boxplot()
+  geom_boxplot() +
+  ylab("Mean Charge") +
+  xlab("Serverity of Illness")
+
+#we will also check the median to avoid issues with skews
+Severity %>%
+  ggplot(aes(APR.Severity.of.Illness.Description, Median.Charge)) +
+  geom_boxplot() +
+  ylab("Median Charge") +
+  xlab("Serverity of Illness")
 
 ```
 
 As expected, it appears extreme cases have higher charges than the other cases. That being said, interestingly enough, there is not much difference in cost between major and minor treatments.
 
-Let's see if there is a relationship between dischage and mean cost in this dataset. The idea behind this hypothesis is that hospitals that treat more patients for a certain procedure or disorder may have improved efficiencies that allows hospitals to lower the treatmet charge. 
+Let's see if there is a relationship between dischage and mean cost in this dataset. The idea behind this hypothesis is that hospitals that treat more patients for a certain procedure or disorder may have improved efficiencies that allows them to lower the treatment charge. 
 
 ```{r}
 
-#boxplot of charge by severity
+#plot of mean charge vs number of cases
 Severity %>%
   ggplot(aes(Discharges, Mean.Charge)) +
+  geom_point() +
+  facet_wrap(~APR.Severity.of.Illness.Description, scales = "free_x")
+
+#median
+Severity %>%
+  ggplot(aes(Discharges, Median.Charge)) +
   geom_point() +
   facet_wrap(~APR.Severity.of.Illness.Description, scales = "free_x")
 
@@ -394,9 +413,9 @@ Unfortunately, it looks like there is no relationship between number of patients
 
 ##Mortality
 
-The next potential predictor we will examine is mortality.
+We now move on to looking at the relationship between mortality and number of cases.
 
-We will re-examine our earlier test of the relationship between cost and number of patients seen.
+First, we will re-examine our earlier test of the relationship between cost and number of patients seen.
 
 ```{r}
 
@@ -414,11 +433,14 @@ ggplot(PV, aes(Denominator, Payment)) +
 
 ```
 
-Again, we see that there is not really a change in cost for a treatment with increased number of cases seen.
+Again, we see that there is not really a change in cost for a treatment with increased number of cases seen. For pneumonia, we do see some normalization of cost to a little under 15000 once the case count gets beyond 500.
 
 Let's now see whether value of care, as defined by mortality and payment intersection, is impacted by the number of cases seen.
 
 ```{r}
+#update the order
+PV$Value.of.care.category <- factor(PV$Value.of.care.category, levels = c("Worse mortality and lower payment", "Worse mortality and average payment", "Worse mortality and higher payment", "Average mortality and lower payment", "Average mortality and average payment", "Average mortality and higher payment", "Better mortality and lower payment", "Better mortality and average payment", "Better mortality and higher payment"), ordered = TRUE)
+
 #let's now check number of cases and value of care
 PV %>%
   ggplot(aes(Value.of.care.category, Denominator)) +
@@ -444,7 +466,10 @@ Let's focus on just mortality, ignoring the payment dimension, and observe the i
 #bucket the mortality rates, ignoring payment
 PV <- PV %>%
   mutate(Care.Cat = ifelse(grepl("Better mortality", Value.of.care.category), "Better Mortality", 
-                           ifelse(grepl("Average mortality", Value.of.care.category), "Average Mortality", "Worse mortality")))
+                           ifelse(grepl("Average mortality", Value.of.care.category), "Average Mortality", "Worse Mortality")))
+
+#reorder
+PV$Care.Cat <- factor(PV$Care.Cat, levels = c("Worse Mortality", "Average Mortality", "Better Mortality"), ordered = TRUE)
 
 #let's plot a boxplot of the number of cases by group
 PV %>%
@@ -460,9 +485,9 @@ In ignoring the payment categories and focusing on just mortality, we can see th
 
 ```{r}
 set.seed(1)
+
 #turn character into numeric
-PV_HF <- mutate(PV, Care.Cat = ifelse(grepl("Better mortality", Value.of.care.category), 3, 
-                           ifelse(grepl("Average mortality", Value.of.care.category), 2, 1))) %>%
+PV_HF <- mutate(PV, Care.Cat = ifelse(grepl("Better Mortality", Care.Cat), 3, ifelse(grepl("Average Mortality", Care.Cat), 2, 1))) %>%
   filter(Payment.measure.ID == "PAYM_30_HF")
 
 
@@ -474,7 +499,12 @@ test_set <- slice(PV_HF, -inTrain$Resample1)
 #fit the data
 fit <- glm(Care.Cat ~ Denominator, data=train_set)
 pred <- predict(fit, newdata = test_set, type = "response")
-tab <- table(pred = round(pred), truth = test_set$Care.Cat)
+
+pred = round(pred)
+truth = test_set$Care.Cat
+u = union(pred, truth)
+
+tab <- table(factor(pred, u), factor(truth, u))
 
 confusionMatrix(tab)$overall["Accuracy"]
 
@@ -484,9 +514,9 @@ It looks like just using the number of cases is actually fairly predictive of th
 
 ```{r}
 set.seed(1)
+
 #turn character into numeric
-PV_PN <- mutate(PV, Care.Cat = ifelse(grepl("Better mortality", Value.of.care.category), 3, 
-                           ifelse(grepl("Average mortality", Value.of.care.category), 2, 1))) %>%
+PV_PN <- mutate(PV, Care.Cat = ifelse(grepl("Better Mortality", Care.Cat), 3, ifelse(grepl("Average Mortality", Care.Cat), 2, 1))) %>%
   filter(Payment.measure.ID == "PAYM_30_PN")
 
 
@@ -508,7 +538,7 @@ From the above, we can see that number of cases seen does not have a strong pred
 
 Let's see what happens when we leverage another database that has actual mortality rates. We will focus on heart failure for now.
 
-```{r}
+```{r, warning = FALSE}
 CH <- complicationshospital %>%
   select(Measure.ID, Denominator, Score)
 
@@ -517,18 +547,22 @@ CH %>%
   filter(Measure.ID == "MORT_30_HF") %>%
   ggplot(aes(Denominator, Score)) +
   geom_point() +
-  geom_smooth()
+  geom_smooth() +
+  ylab("Heart Failure Mortality Rate") +
+  xlab("Number of Cases")
 ```
 
 It looks like there is a slight increase in mortality rate when the number of cases increase, but then it drops off as the number of cases continue to grow. Let's now explore additional measures such as mortality rate for AMI and Strokes.
 
-```{r}
+```{r, warning = FALSE}
 #let's add on the relationship for AMI and STK
 CH %>%
   filter(Measure.ID %in% c("MORT_30_HF", "MORT_30_AMI", "MORT_30_STK")) %>%
   ggplot(aes(Denominator, Score, colour = Measure.ID)) +
   geom_point() +
-  geom_smooth() 
+  geom_smooth()  +
+  ylab("Mortality Rate") +
+  xlab("Number of Cases")
 
 ```
 
@@ -560,7 +594,7 @@ kable(res_HF)
 kable(res_AMI)
 ```
 
-From the above, we can see that with each additional case of HF, a hospital's rate of mortality decreases between 0.01% to 0.02%. For AMI, the rate of decrease is even higher at 0.01% to 0.04%. 
+From the above, we can see that with each additional case of HF, a hospital's rate of mortality decreases between 0.1% to 0.2%. For AMI, the rate of decrease is even higher at 0.1% to 0.4%. 
 
 Another database that has mortality rating is PCIbyhospital. Let's see if we can find the same relationship there.
 
@@ -601,7 +635,7 @@ kable(res_Obs)
 kable(res_Adj)
 ```
 
-We see about the same relationship of 0.01%-0.04% decrease in mortality rate for each additional case seen.
+We see about a similar relationship but at a decreased magnitude of 0.01%-0.04% decrease in mortality rate for each additional case seen.
 
 #Final Model for HCAHPS Star Rating
 
@@ -611,12 +645,13 @@ Now that we have explored the other datasets, we will start examining the relati
 
 First, we will examine cost. Cost is notoriously nebulous and difficult to understand in healthcare. It is nearly impossible to get a quote on the cost of a procedure before going to the hospital. Often patients never see the bill after going to the hospital. So we wondered what effect, if any, cost would have on patient satisfaction. Are patients less likely to be satisfied with an expensive hospital, or perhaps the care and overall expirience are better at more expensive hospitals and so they are more likely to get high ratings?
 
-```{r}
+```{r, warning= FALSE}
 #add cost metrics
 cost <- paymentandvalue %>%
   select(c(Provider.ID, Hospital.name, Payment.measure.ID, Denominator, Payment)) %>%
   right_join(HCAHPS, by = "Provider.ID")
 
+#plot our results by case
 cost %>% 
   filter(Payment.measure.ID == "PAYM_30_AMI") %>%
   ggplot(aes(H_STAR_RATING, Payment)) +
@@ -638,7 +673,7 @@ cost %>%
 
 ```
 
-Interestingly, cost does not appear to have a consistent relationship with star rating. Only cost for pneumonia treatment appears to be decreasing with increase star rating.
+Interestingly, cost does not appear to have a consistent relationship with star rating. Only cost for pneumonia treatment appears to be decreasing with increased star rating.
 
 What about mortality rates?
 
@@ -654,7 +689,7 @@ mort[mort == "Not Available"] = NA
 mort <- HCAHPS %>%
   right_join(mort, by = "Provider.ID")
 
-#plot our results
+#plot our results by case
 mort %>% 
   select(H_STAR_RATING, MORT_30_AMI) %>%
   unique() %>%
@@ -683,10 +718,10 @@ mort %>%
 
 Much like cost, mortality does not appear to have a consistent relationship with star rating. AMI mortality rates only had a slight decline with increased star rating. Surprisingly, HF mortality rates appear to actually increase with higher star ratings.
 
-Let us return to our analysis of mortality rates. We will examine whether the risk adjusted mortality rates at hospitals are predictive of star ratings
+How do mortality rates from PCI compare? 
 
 ```{r}
-#merge mortality info
+#merge mortality info from PCI
 PCIbyhospital <- PCIbyhospital %>%
   left_join(ID_key, by = "Facility.Id")
 
@@ -710,6 +745,7 @@ Based on the above boxplots, it looks like there is no real difference in mortal
 Finally, given that we saw some weak relationship between number of cases seen and mortality, let us take a look at its relationship to star rating.
 
 ```{r}
+#we will use number of cases seen from the complications table
 cost %>%
   filter(Payment.measure.ID == "PAYM_30_PN") %>%
   ggplot(aes(H_STAR_RATING, Denominator)) +
@@ -740,7 +776,7 @@ There does not appear to be a significant relationship between cases seen and st
 We hypothesized that hospitals with higher HCAHPS scores would have lower 30 day readmission rates. 
 
 We analyzed the rate of patients readmitted for a complaint related to their original admission within 30 days of discharge for patients of all disease types:
-```{r}
+```{r, warning = FALSE}
 readmissionInfection <- filter(readmission, Measure.Name=="READM-30-COPD-HRRP") %>% 
   select(Hospital.Name, Provider.Number, Number.of.Readmissions, Number.of.Discharges)
 
@@ -758,7 +794,7 @@ readmitHCAHPS <- left_join(HCAHPS, readmissionInfection, by= c("Provider.ID" = "
 readmitHCAHPS %>%
   ggplot(aes(H_STAR_RATING, readmissionRate)) + 
   geom_boxplot() + 
-  xlab("HCAHPS Score") + 
+  xlab("Star Rating") + 
   ylab("Readmission Rate")
 
 ```
@@ -766,7 +802,7 @@ readmitHCAHPS %>%
 Indeed, there seems to be a trend towards lower 30 readmission rates for hospitals with higher HCAHPS scores. 
 
 If our theory is, indeed, true then we would expect that patients with lower readmission rates would rate their discharge instructions and communication about medicines highly:
-```{r}
+```{r, warning = FALSE}
 readmitHCAHPS %>%
   ggplot(aes(H_COMP_5_LINEAR_SCORE, readmissionRate)) + 
   geom_point() + 
@@ -778,7 +814,7 @@ readmitHCAHPS %>%
 readmitHCAHPS %>%
   ggplot(aes(H_COMP_6_LINEAR_SCORE, readmissionRate)) + 
   geom_point() + 
-  geom_smooth() + 
+  geom_smooth(span = .5) + 
   xlab("Communication about Medicine Score") +
   ylab("Readmission Rate") + 
   ggtitle("Communication about Medicine")
@@ -792,7 +828,7 @@ There seems to be a downward trend in readmssion rates as the rating of the disc
 
 Time spent in the emergency department is more commonly being looked at as an indicator of the overall patient expirience. We looked at the time it took hospitals to move admitted patients out of the ED to their rooms and compared it with HCAHPS score.
 
-```{r}
+```{r, warning = FALSE}
 #time in ED
 temp <- timely %>%
   filter(Measure.ID=="ED_1b") #Median time from emergency department arrival to emergency department departure for admitted emergency department patients
@@ -836,9 +872,9 @@ CompsHCAHPS <- left_join(BloodClotScore, HCAHPS, by= "Provider.ID") %>%
 CompsHCAHPS %>%
   ggplot(aes(H_STAR_RATING, Clot.Score)) + 
   geom_boxplot() + 
-  xlab("HCAHPS Score") + 
+  xlab("Star Rating") + 
   ylab("Clot Rate") + 
-  ggtitle("Clots")
+  ggtitle("Clots vs. Star Rating")
 
 
 ```
@@ -848,7 +884,7 @@ HCAHPS star ratings do not appear to have dramatically different rates of seriou
 
 Finally, to round out our examination of various survival metrics, let us also examine infections.
 
-```{r}
+```{r, warning = FALSE}
 #merge infection info
 tmp <- hospitalinfection %>%
   filter(Year == 2014) %>%
@@ -919,9 +955,9 @@ heatmap.2(as.matrix(final_dat_dist),
           notecex=1.0,
           notecol="cyan",
           dendrogram = 'none',
+          trace = 'none',
           key = FALSE)
 
-M2 <- cor(final_dat)
 
 ```
 
@@ -942,7 +978,8 @@ res_knn <- train(Star_Rating ~ .,
 res_knn$results %>% 
   ggplot(aes(k, RMSE, ymin= RMSE - RMSESD, 
              ymax = RMSE + RMSESD)) +
-  geom_point() + geom_errorbar()
+  geom_point() + geom_errorbar() +
+  ggtitle("RMSE over k")
 
 res_knn
 ```

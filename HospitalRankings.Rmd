@@ -270,11 +270,9 @@ heatmap.2(as.matrix(HCAHPS_dist),
           notecex=1.0,
           notecol="cyan",
           dendrogram = 'none',
+          trace='none',
           key = FALSE)
 
-#let's take a look at the correlation too
-M <- cor(HCAHPS_sum)
-corrplot(M, method = "circle") #plot matrix
 ```
 
 It looks like nurse communication is the closest to star rating, followed by Medication Communication.
@@ -298,7 +296,8 @@ res_knn <- train(Star_Rating ~ .,
 res_knn$results %>% 
   ggplot(aes(k, RMSE, ymin= RMSE - RMSESD, 
              ymax = RMSE + RMSESD)) +
-  geom_point() + geom_errorbar()
+  geom_point() + geom_errorbar() +
+  ggtitle("RMSE over K")
 
 res_knn
 ```
@@ -325,15 +324,43 @@ confusionMatrix(tab)$overall["Accuracy"]
 
 From the above, we see that the remaining metrics in HCAHPS has about a 90% accuracy rating in predicting star ratings.
 
+What happens when we try to replicate this 10 times?
+
+```{r}
+
+knn_10 <- sapply(1:10, function(i){
+  inTrain <- createDataPartition(y = HCAHPS_sum$Star_Rating , p = 0.8)
+  train_set <- slice(HCAHPS_sum, inTrain$Resample1)
+  test_set <- slice(HCAHPS_sum, -inTrain$Resample1)
+  
+  test_set$Star_Rating  <- factor(test_set$Star_Rating )
+  
+  pred <- predict(res_knn, newdata = test_set)
+  
+  #special treatment to catch corner cases where the number of stars in the prediction don't match the number of stars in the truth (i.e. there is a 4 star in the truth but not in the prediction)
+  
+  pred = round(pred)
+  truth = test_set$Star_Rating
+  u = union(pred, truth)
+  tab <- table(factor(pred, u), factor(truth, u))
+  
+  confusionMatrix(tab)$overall["Accuracy"] 
+})
+
+mean(knn_10)
+sd(knn_10)
+  
+```
+
+We still have an average accuracy of around 90%, with a standard deviation of around 4%.
+
 Now, we will expand our search outside of the HCAHPS and see if metrics from other databases can help us improve our predicitons. Before we link these new metrics to HCAHPS, we will first explore each dataset and examine some additional hypothesis that would impact patient experience.
 
 #Data exploration of other potential predictors
 
-As we have several other potential predictors in our other datasets, we will limit this preliminary data exploration to just those that have cost and mortality metrics, as these two are by conventional wisdom most likely to impact patient experience. We will examine the relationship that these two measures have with a critical third measure: the hospital case load.
+As we have several other potential predictors in our other datasets, we will limit this preliminary data exploration to just those that have cost and mortality metrics, as these two are by conventional wisdom most likely to impact patient experience. We will examine the relationship that these two measures have with a critical third measure: the hospital case load. Our general hypothesis is that case load is a sign of experience treating a certain disorder. This may lead to better and more efficient treatment that will lower costs and increase survival.
 
 ##Cost
-
-Cost is notriously nebulous and difficult to understand in healthcare. It is nearly impossible to get a quote on the cost of a procedure before going to the hospital. Often patients never see the bill after going to the hospital. So we wondered what effect, if any, cost would have on patient satisfaction. Are patients less likely to be satisfied with an expensive hospital, or perhaps the care and overall expirience are better at more expensive hospitals and so they are more likely to get high ratings?
 
 First, let us sanity check this dataset and verify that cost is higher for more severe treatments.
 
@@ -582,7 +609,7 @@ Now that we have explored the other datasets, we will start examining the relati
 
 ##Cost and Mortality
 
-First, we will examine cost.
+First, we will examine cost. Cost is notoriously nebulous and difficult to understand in healthcare. It is nearly impossible to get a quote on the cost of a procedure before going to the hospital. Often patients never see the bill after going to the hospital. So we wondered what effect, if any, cost would have on patient satisfaction. Are patients less likely to be satisfied with an expensive hospital, or perhaps the care and overall expirience are better at more expensive hospitals and so they are more likely to get high ratings?
 
 ```{r}
 #add cost metrics
@@ -886,7 +913,13 @@ final_dat_dist <- as.matrix(final_dat) %>%
 
 final_dat <- subset(final_dat, select=c(Star_Rating,ER_Wait:Quietness))
 
-heatmap(as.matrix(final_dat_dist), margins = c(10,10))
+heatmap.2(as.matrix(final_dat_dist), 
+          margins = c(10,10),
+          cellnote= round(as.matrix(final_dat_dist),4), 
+          notecex=1.0,
+          notecol="cyan",
+          dendrogram = 'none',
+          key = FALSE)
 
 M2 <- cor(final_dat)
 
@@ -935,4 +968,27 @@ confusionMatrix(tab)$overall["Accuracy"]
 
 ```
 
+```{r}
 
+knn_10 <- sapply(1:10, function(i){
+  inTrain <- createDataPartition(y = HCAHPS_sum$Star_Rating , p = 0.8)
+  train_set <- slice(HCAHPS_sum, inTrain$Resample1)
+  test_set <- slice(HCAHPS_sum, -inTrain$Resample1)
+  
+  test_set$Star_Rating  <- factor(test_set$Star_Rating )
+  
+  pred <- predict(res_knn, newdata = test_set)
+  
+  #special treatment to catch corner cases where the number of stars in the prediction don't match the number of stars in the truth (i.e. there is a 4 star in the truth but not in the prediction)
+  
+  pred = round(pred)
+  truth = test_set$Star_Rating
+  u = union(pred, truth)
+  tab <- table(factor(pred, u), factor(truth, u))
+  
+  confusionMatrix(tab)$overall["Accuracy"] 
+})
+
+mean(knn_10)
+sd(knn_10)
+```

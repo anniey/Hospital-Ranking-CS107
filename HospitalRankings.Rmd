@@ -385,11 +385,11 @@ sd(knn_10)
 
 We still have an average accuracy of around 90%, with a standard deviation of around 4%.
 
-Now, we will expand our search outside of the HCAHPS and see if metrics from other databases can help us improve our predicitons. Before we link these new metrics to HCAHPS, we will first explore each dataset and examine some additional hypothesis that would impact patient experience.
+Now, we will expand our search outside of the HCAHPS and see if metrics from other databases can help us improve our predicitons. Before we link these new metrics to HCAHPS, we will first explore each dataset and examine some additional hypotheses that would impact patient experience.
 
 #Data exploration of other potential predictors
 
-As we have several other potential predictors in our other datasets, we will limit this preliminary data exploration to just those that have cost and mortality metrics, as these two are by conventional wisdom most likely to impact patient experience. We will examine the relationship that these two measures have with a critical third measure: the hospital case load. Our general hypothesis is that case load is a sign of experience treating a certain disorder. This may lead to better and more efficient treatment that will lower costs and increase survival.
+As we have several other potential predictors in our other datasets, we will limit this preliminary data exploration to just those that have cost and mortality metrics, as we assume that these two are most likely to impact patient experience. Additionally, we will consider the hospital case load. Our hypothesis is that hospitals with higher case loads have more expirience treating a given disease which may translate to better and more efficient treatment that will lower costs and increase survival.
 
 ##Cost
 
@@ -421,7 +421,11 @@ Severity %>%
 
 As expected, it appears extreme cases have higher charges than the other cases. That being said, interestingly enough, there is not much difference in cost between major and minor treatments.
 
+<<<<<<< HEAD
 Let's see if there is a relationship between dischage and mean cost in this dataset. The idea behind this hypothesis is that hospitals that treat more patients for a certain procedure or disorder may have improved efficiencies that allows them to lower the treatment charge. 
+=======
+Let's see if there is a relationship between the number of patients dischaged and mean cost in this dataset. The idea behind this hypothesis is that hospitals that treat more patients for a certain procedure or disorder may have improved efficiencies that allows hospitals to lower the treatmet charge. 
+>>>>>>> 606f4e677d33220e77d6861460511a5d62794ca1
 
 ```{r}
 
@@ -963,7 +967,7 @@ It looks like infections from hospitals is slightly lower for the higher 4 star 
 
 ##Aggregating the findings
 
-From all of the analysis above, it looks like the best candidates for additional predictors of HCAHPS star rating is readmission, time to emergency room, heart attack mortality, and payments for pneumonia.
+From all of the analysis above, it looks like the best candidates for additional predictors of HCAHPS star rating are readmission, time spent in the emergency room, heart attack mortality, and payments for pneumonia.
 
 ```{r, fig.height = 8, fig.width = 10, warning=FALSE}
 #create the final dataset

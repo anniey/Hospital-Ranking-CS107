@@ -15,6 +15,7 @@ Load files from github repo:
 ```{r}
 library(dplyr)
 library(tidyr)
+library(gplots)
 library(ggplot2)
 library(broom)
 library(knitr)
@@ -234,13 +235,16 @@ Let's plot these scores and see if there is any relationship to star rating.
 ```{r}
 HCAHPS %>%
   ggplot(aes(H_STAR_RATING, HCAHPS.Linear.Mean.Value)) +
-  geom_boxplot()
+  geom_boxplot() +
+  ylab("Linear Score") +
+  xlab("Star Rating") +
+  ggtitle("Star Rating vs. Linear Score of Other HCAHPS Metrics")
 
 ```
 
-A quick look at the aggregated scores against star ratings boxplot shows a weak positive relationship between the scores and the star rating. Now, let's see which of the scores are most predictive of a hospitals star rating.
+A quick look at the aggregated scores against star ratings boxplot shows a strong positive relationship between the scores and the star rating. Now, let's see which of the scores are most predictive of a hospitals star rating.
 
-```{r}
+```{r, warning = FALSE}
 #find the distance between the scores and star rating
 HCAHPS <- HCAHPS %>%
   spread(HCAHPS.Measure.ID, HCAHPS.Linear.Mean.Value) 
@@ -260,7 +264,13 @@ HCAHPS_dist <- as.matrix(HCAHPS_sum) %>%
   t() %>%
   dist()
 
-heatmap(as.matrix(HCAHPS_dist), margins = c(10,10))
+heatmap.2(as.matrix(HCAHPS_dist), 
+          margins = c(10,10),
+          cellnote= round(as.matrix(HCAHPS_dist),4), 
+          notecex=1.0,
+          notecol="cyan",
+          dendrogram = 'none',
+          key = FALSE)
 
 #let's take a look at the correlation too
 M <- cor(HCAHPS_sum)

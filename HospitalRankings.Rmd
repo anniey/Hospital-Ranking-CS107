@@ -209,14 +209,36 @@ We now have a key matching facility ID to provider ID for around 130 hospitals. 
 #Part 1: Examining HCAHPS
 
 ```{r, echo = FALSE}
-#let's show the HCAHPS Star rating by zip code in NY
+map_star <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/For%20Map%20only.csv")
+
+#let's show the HCAHPS Star rating by county in US
+colnames(map_star) <- c("county.name", "value")
+
+map_star <- map_star %>%
+  filter(value != "Not Available", value != "Not Applicable", county.name != "")
+
+map_star$value <- as.numeric(as.character(map_star$value)) 
+map_star$county.name <- tolower(map_star$county.name)
+
+#map the counties to fips
+data(county.regions)
+map_star <- map_star %>%
+  left_join(county.regions, by = "county.name") %>%
+  select(c(region, value)) %>%
+  group_by(region) %>%
+  summarise(value = mean(value))
+
+county_choropleth(map_star, 
+                  title = "US HCAHPS Average Star Rating by County", legend = "Average Star Rating")
+
+  
+#filter for just NYC
 df_star_zip <- hcahps %>%
   filter(HCAHPS.Measure.ID == "H_STAR_RATING") %>%
   select(c(ZIP.Code, Patient.Survey.Star.Rating)) 
 
 colnames(df_star_zip) <- c("region", "value")
 
-#find the average star rating
 df_star_zip$value <- as.numeric(as.character(df_star_zip$value)) 
 
 df_star_zip <- df_star_zip %>%
@@ -231,7 +253,7 @@ nycmap = ZipChoropleth$new(df_star_zip)
 nyc_fips = c(36005, 36047, 36061, 36081, 36085)
 zip_choropleth(df_star_zip, 
                county_zoom=nyc_fips, 
-               title="HCAHPS Star Rating by Zip Code",
+               title="HCAHPS Star Rating by Zip Code for NYC",
                legend="Star Rating")
 
 ```
@@ -421,11 +443,9 @@ Severity %>%
 
 As expected, it appears extreme cases have higher charges than the other cases. That being said, interestingly enough, there is not much difference in cost between major and minor treatments.
 
-<<<<<<< HEAD
+
 Let's see if there is a relationship between dischage and mean cost in this dataset. The idea behind this hypothesis is that hospitals that treat more patients for a certain procedure or disorder may have improved efficiencies that allows them to lower the treatment charge. 
-=======
-Let's see if there is a relationship between the number of patients dischaged and mean cost in this dataset. The idea behind this hypothesis is that hospitals that treat more patients for a certain procedure or disorder may have improved efficiencies that allows hospitals to lower the treatmet charge. 
->>>>>>> 606f4e677d33220e77d6861460511a5d62794ca1
+
 
 ```{r}
 

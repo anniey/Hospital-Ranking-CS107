@@ -11,7 +11,7 @@ As part of the Affordable Care Act, the government created a national, standardi
 
 Our project will create a predictive model of star ratings for NY hospitals. First, we will look at other metrics within HCAHPS that can be leveraged within our model. Then, we will explore other hospital/Medicare databases and see whether metrics such as cost, mortality rates, infection rates, readmission rates, and waiting times are also predictive of star ratings.
 
-Load data from local file:
+Load files from github repo:
 ```{r}
 library(dplyr)
 library(tidyr)
@@ -53,7 +53,7 @@ readmission <- readmission %>% filter(State=="NY")
 ```
 
 Additional wrangling of factor to numeric
-```{r}
+```{r, warning = FALSE}
 
 complicationshospital$Denominator <- as.numeric(as.character(complicationshospital$Denominator))
 complicationshospital$Score <- as.numeric(as.character(complicationshospital$Score))
@@ -82,7 +82,7 @@ paymentandvalue$Provider.ID <- as.character(levels(paymentandvalue$Provider.ID))
   as.numeric()
 ```
 
-Becuause there are no coommon identifiers between national and state data, we will have to perform our join using hospital names.
+Becuause there are no common identifiers between national and state data (national uses Provider ID and NY state uses Facility ID), we will have to perform our join using hospital names.
 
 
 ```{r}
@@ -202,7 +202,7 @@ ID_key <- merge(FacilityNames, HospitalNames, by = "Hospital.Name", all = TRUE) 
 
 We now have a key matching facility ID to provider ID for around 130 hospitals. We can use this later when we are looking to investigate the relationship between metrics from the national datasets (eg HCAHPS, readmission) and the New York datasets (eg infection rates, payments)
 
-#Part 1: Examinig HCAHPS
+#Part 1: Examining HCAHPS
 
 For HCAHPS, we are only really concerned with the linear score and the star rating. Let's keep only those metrics and spread the measures so that each measure ID is its own column.
 

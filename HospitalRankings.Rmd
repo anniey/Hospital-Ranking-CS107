@@ -5,11 +5,9 @@ date: "April 20, 2016"
 output: html_document
 ---
 
-The purpose of this project is to examine the Hospital Consumer Assessment of Healthcare Providers and Systems (HCAHPS) and related medical metrics that capture patient's overall experience at a hospital. 
+The purpose of this project is to examine the Hospital Consumer Assessment of Healthcare Providers and Systems (HCAHPS) and related healthcare quality and patient safety metrics that capture patient's overall experience at a hospital. 
 
-As part of the Affordable Care Act, the government issued the creation of a national, standardized, publicly reported survey of patients' perspectives of hospital care (i.e. the HCAHPS). The HCAHPS contains numerous qualitative measures of a patient's experience including cleanliness of the hospital, pain management, effective communication by doctors and nurses, etc. The most visible and highly focused of these metrics are the star ratings. HCAHPS Scores are based on surveys sent to patients by the Centers for Medicaid and Medicare (CMS). The highest rating a hospital can get is 5 stars and the lowest is 1 star. A random sampling of patients receive surveys from CMS. The survey questions are primarily centered around patient satisfaction and quality of service in the hospital. Most of the questions are about the patients expirience with his or her providers such as: how did your doctor communicate with you? Did the staff explain the medications you were given? Was your pain well managed?
-
-Higher HCAHPS scores may be in indication that the staff communicates effectively and that patients go home with a better understand of how to take care of themselves.
+As part of the Affordable Care Act, the government created a national, standardized, publicly reported survey of the patient's expirience by hospital (i.e. the HCAHPS). The HCAHPS contains qualitative measures of a patient's experience including cleanliness of the hospital, pain management, effective communication by doctors and nurses, etc. HCAHPS Scores are based on surveys sent to patients by the Centers for Medicaid and Medicare (CMS).  A random sampling of patients receive surveys from CMS.  The survey responses are controlled for a number of factors including demographics and hospital location. CMS publishes a star rating for each of the survey questions and for an overall score, the highest rating a hospital can get is 5 stars and the lowest is 1 star.The survey questions are primarily centered around patient satisfaction and quality of service in the hospital, such as: how well did your doctor communicate with you? Did the staff explain the medications you were given? Was your pain well managed? Was it quiet?
 
 Our project will create a predictive model of star ratings for NY hospitals. First, we will look at other metrics within HCAHPS that can be leveraged within our model. Then, we will explore other hospital/Medicare databases and see whether metrics such as cost, mortality rates, infection rates, readmission rates, and waiting times are also predictive of star ratings.
 
@@ -43,7 +41,9 @@ hospitalinfection <- read.csv("https://raw.githubusercontent.com/anniey/Hospital
 ```
 
 #Wrangling
-Limit Data Sets to NYS only:
+Our datasets are publically available from either New York State or the federal government. New York State and the federal government have different naming conventions and don't share a common identifier for hospitals. In order to get compary data from the two sources we need to wrangle the data. 
+
+Firstly, let's limit national data sets to New York State only:
 ```{r}
 paymentandvalue <- paymentandvalue %>% filter(State=="NY")
 complicationshospital <- complicationshospital %>% filter(State=="NY")
@@ -82,7 +82,7 @@ paymentandvalue$Provider.ID <- as.character(levels(paymentandvalue$Provider.ID))
   as.numeric()
 ```
 
-Our datasets are a mixture of national and NY databases. The former uses provider ID to tag hospitals while the later uses facility ID. There are no common code between the two, so we will have to perform our join using hospital names.
+Becuause there are no coommon identifiers between national and state data, we will have to perform our join using hospital names.
 
 
 ```{r}
@@ -317,13 +317,13 @@ From the above, we see that the remaining metrics in HCAHPS has about a 90% accu
 
 Now, we will expand our search outside of the HCAHPS and see if metrics from other databases can help us improve our predicitons. Before we link these new metrics to HCAHPS, we will first explore each dataset and examine some additional hypothesis that would impact patient experience.
 
-#Data Exploration of other potential predictors
+#Data exploration of other potential predictors
 
-As we have several other potential predictors in our other datasets, we will limit this preliminary data exploration to just those that have cost and mortality metrics, as these two are by conventional wisdom most likely to impact patient experience. We will examine the relationship that these two measures have with a critical third measure, the hospital case load.
+As we have several other potential predictors in our other datasets, we will limit this preliminary data exploration to just those that have cost and mortality metrics, as these two are by conventional wisdom most likely to impact patient experience. We will examine the relationship that these two measures have with a critical third measure: the hospital case load.
 
 ##Cost
 
-One clear potential predictor in a patient's experience is the cost of treatment.
+Cost is notriously nebulous and difficult to understand in healthcare. It is nearly impossible to get a quote on the cost of a procedure before going to the hospital. Often patients never see the bill after going to the hospital. So we wondered what effect, if any, cost would have on patient satisfaction. Are patients less likely to be satisfied with an expensive hospital, or perhaps the care and overall expirience are better at more expensive hospitals and so they are more likely to get high ratings?
 
 First, let us sanity check this dataset and verify that cost is higher for more severe treatments.
 

@@ -1,6 +1,6 @@
 ---
-title: "HospitalRankings"
-author: "Michael Zelenetz, Xiojing Yang"
+title: "Hospital Rankings"
+author: "Michael Zelenetz, Xiaojing Yang"
 date: "April 20, 2016"
 output: html_document
 ---
@@ -13,16 +13,14 @@ Our project will create a predictive model of star ratings for NY hospitals. Fir
 
 Load files from github repo:
 ```{r}
-library(dplyr)
+library(broom)
+library(caret)
+library(knitr)
 library(tidyr)
 library(gplots)
 library(ggplot2)
-library(broom)
-library(knitr)
-library(caret)
-library(choroplethr) #install_github("choroplethr", "trulia")
-library(choroplethrZip) #install_github('arilamstein/choroplethrZip@v1.5.0')
-library(choroplethrMaps)
+library(dplyr)
+
 
 #cost sets
 paymentandvalue <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/Payment_and_value_of_care_-_Hospital.csv") #national
@@ -96,7 +94,7 @@ facilityID_data <- hospitalinfection %>%
   filter(Facility.Id > 0, Year == 2014 ) %>%
   select(Facility.Id, Hospital.Name, Infections.observed) %>%
   group_by(Facility.Id, Hospital.Name) %>%
-  summarise(Infections = sum(Infections.observed) )
+  summarise(Infections = mean(Infections.observed))
 
 #adjust col names of PCI
 colnames(PCIbyhospital)[1] <- "Facility.Id"
@@ -207,56 +205,6 @@ ID_key <- merge(FacilityNames, HospitalNames, by = "Hospital.Name", all = TRUE) 
 We now have a key matching facility ID to provider ID for around 130 hospitals. We can use this later when we are looking to investigate the relationship between metrics from the national datasets (eg HCAHPS, readmission) and the New York datasets (eg infection rates, payments)
 
 #Part 1: Examining HCAHPS
-
-```{r, echo = FALSE}
-map_star <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/For%20Map%20only.csv")
-
-#let's show the HCAHPS Star rating by county in US
-colnames(map_star) <- c("county.name", "value")
-
-map_star <- map_star %>%
-  filter(value != "Not Available", value != "Not Applicable", county.name != "")
-
-map_star$value <- as.numeric(as.character(map_star$value)) 
-map_star$county.name <- tolower(map_star$county.name)
-
-#map the counties to fips
-data(county.regions)
-map_star <- map_star %>%
-  left_join(county.regions, by = "county.name") %>%
-  select(c(region, value)) %>%
-  group_by(region) %>%
-  summarise(value = mean(value))
-
-county_choropleth(map_star, 
-                  title = "US HCAHPS Average Star Rating by County", legend = "Average Star Rating")
-
-  
-#filter for just NYC
-df_star_zip <- hcahps %>%
-  filter(HCAHPS.Measure.ID == "H_STAR_RATING") %>%
-  select(c(ZIP.Code, Patient.Survey.Star.Rating)) 
-
-colnames(df_star_zip) <- c("region", "value")
-
-df_star_zip$value <- as.numeric(as.character(df_star_zip$value)) 
-
-df_star_zip <- df_star_zip %>%
-  na.omit() %>%
-  group_by(region) %>%
-  summarise(value = mean(value))
-
-df_star_zip$region <- as.character(df_star_zip$region)
-
-#map the star ratings for NYC
-nycmap = ZipChoropleth$new(df_star_zip)
-nyc_fips = c(36005, 36047, 36061, 36081, 36085)
-zip_choropleth(df_star_zip, 
-               county_zoom=nyc_fips, 
-               title="HCAHPS Star Rating by Zip Code for NYC",
-               legend="Star Rating")
-
-```
 
 For HCAHPS, we are only really concerned with the linear score and the star rating. Let's keep only those metrics and spread the measures so that each measure ID is its own column.
 

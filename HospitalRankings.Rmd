@@ -20,6 +20,10 @@ library(ggplot2)
 library(broom)
 library(knitr)
 library(caret)
+library(choroplethr) #install_github("choroplethr", "trulia")
+library(choroplethrZip) #install_github('arilamstein/choroplethrZip@v1.5.0')
+library(choroplethrMaps)
+
 #cost sets
 paymentandvalue <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/Payment_and_value_of_care_-_Hospital.csv") #national
 inpatientcost <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/Hospital_Inpatient_Cost_Transparency__Beginning_2009.csv") #NYS
@@ -204,6 +208,34 @@ We now have a key matching facility ID to provider ID for around 130 hospitals. 
 
 #Part 1: Examining HCAHPS
 
+```{r, echo = FALSE}
+#let's show the HCAHPS Star rating by zip code in NY
+df_star_zip <- hcahps %>%
+  filter(HCAHPS.Measure.ID == "H_STAR_RATING") %>%
+  select(c(ZIP.Code, Patient.Survey.Star.Rating)) 
+
+colnames(df_star_zip) <- c("region", "value")
+
+#find the average star rating
+df_star_zip$value <- as.numeric(as.character(df_star_zip$value)) 
+
+df_star_zip <- df_star_zip %>%
+  na.omit() %>%
+  group_by(region) %>%
+  summarise(value = mean(value))
+
+df_star_zip$region <- as.character(df_star_zip$region)
+
+#map the star ratings for NYC
+nycmap = ZipChoropleth$new(df_star_zip)
+nyc_fips = c(36005, 36047, 36061, 36081, 36085)
+zip_choropleth(df_star_zip, 
+               county_zoom=nyc_fips, 
+               title="HCAHPS Star Rating by Zip Code",
+               legend="Star Rating")
+
+```
+
 For HCAHPS, we are only really concerned with the linear score and the star rating. Let's keep only those metrics and spread the measures so that each measure ID is its own column.
 
 ```{r}
@@ -243,7 +275,7 @@ HCAHPS %>%
 
 A quick look at the aggregated scores against star ratings boxplot shows a strong positive relationship between the scores and the star rating. Now, let's see which of the scores are most predictive of a hospitals star rating.
 
-```{r, warning = FALSE}
+```{r, fig.height = 8, fig.width = 10, warning=FALSE}
 #find the distance between the scores and star rating
 HCAHPS <- HCAHPS %>%
   spread(HCAHPS.Measure.ID, HCAHPS.Linear.Mean.Value) 
@@ -445,14 +477,18 @@ PV %>%
   ggplot(aes(Value.of.care.category, Denominator)) +
   geom_boxplot() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  ylab("Number of Cases")
+  ylab("Number of Cases") +
+  xlab("Value of Care") +
+  ggtitle("Value of Care vs. Number of Cases")
 
 #let's check heart disease in particular
 PV %>% filter(Payment.measure.ID == "PAYM_30_HF") %>%
   ggplot(aes(Value.of.care.category, Denominator)) +
   geom_boxplot() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  ylab("Number of Cases")
+  ylab("Number of Cases") +
+  xlab("Value of Care") +
+  ggtitle("Value of Care vs. Number of Cases for Heart Failure")
 
 
 ```
@@ -476,6 +512,7 @@ PV %>%
   geom_boxplot() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   ylab("Number of Cases") +
+  xlab("Mortaity Rate") +
   facet_wrap(~Payment.measure.ID, scales = "free_x")
 
 ```
@@ -608,13 +645,18 @@ PCI_mort <- PCIbyhospital %>%
 PCI_mort %>%
   ggplot(aes(Number.of.Cases, Risk.Adjusted.Mortality.Rate)) +
   geom_point() +
-  geom_smooth()
+  geom_smooth(span = .5) +
+  xlab("Risk Adjusted Mortality Rate") +
+  ylab("Number of PCI Cases")
 
 #plot observed rate
 PCI_mort %>%
   ggplot(aes(Number.of.Cases, Observed.Mortality.Rate)) +
   geom_point() +
-  geom_smooth()
+  geom_smooth() +
+  geom_smooth(span = .5) +
+  xlab("Observed Mortality Rate") +
+  ylab("Number of PCI Cases")
 
 ```
 
@@ -655,19 +697,22 @@ cost %>%
   filter(Payment.measure.ID == "PAYM_30_AMI") %>%
   ggplot(aes(H_STAR_RATING, Payment)) +
   geom_boxplot() +
-  ggtitle("Payment for AMI vs. Star Rating")
+  ggtitle("Payment for AMI vs. Star Rating") +
+  xlab("Star Rating")
 
 cost %>% 
   filter(Payment.measure.ID == "PAYM_30_HF") %>%
   ggplot(aes(H_STAR_RATING, Payment)) +
   geom_boxplot() +
-  ggtitle("Payment for Heart Failure vs Star Rating")
+  ggtitle("Payment for Heart Failure vs Star Rating") +
+  xlab("Star Rating")
 
 cost %>% 
   filter(Payment.measure.ID == "PAYM_30_PN") %>%
   ggplot(aes(H_STAR_RATING, Payment)) +
   geom_boxplot() +
-  ggtitle("Payment for Pneumonia vs Star Rating")
+  ggtitle("Payment for Pneumonia vs Star Rating") +
+  xlab("Star Rating")
 
 
 ```
@@ -694,25 +739,29 @@ mort %>%
   unique() %>%
   ggplot(aes(H_STAR_RATING, MORT_30_AMI)) +
   geom_boxplot() +
-  ggtitle("AMI Mortality vs Star Rating")
+  ggtitle("AMI Mortality vs Star Rating") +
+  xlab("Star Rating")
 
 mort %>% 
   select(H_STAR_RATING, MORT_30_HF) %>%
   ggplot(aes(H_STAR_RATING, MORT_30_HF)) +
   geom_boxplot() +
-  ggtitle("Heart Failure Mortality vs Star Rating")
+  ggtitle("Heart Failure Mortality vs Star Rating") +
+  xlab("Star Rating")
 
 mort %>% 
   select(H_STAR_RATING, MORT_30_STK) %>%
   ggplot(aes(H_STAR_RATING, MORT_30_STK)) +
   geom_boxplot() +
-  ggtitle("Stroke Mortality vs Star Rating")
+  ggtitle("Stroke Mortality vs Star Rating") +
+  xlab("Star Rating")
 
 mort %>% 
   select(H_STAR_RATING, MORT_30_PN) %>%
   ggplot(aes(H_STAR_RATING, MORT_30_PN)) +
   geom_boxplot() +
-  ggtitle("Pneumonia Mortatlity vs Star Rating")
+  ggtitle("Pneumonia Mortatlity vs Star Rating") +
+  xlab("Star Rating")
 ```
 
 Much like cost, mortality does not appear to have a consistent relationship with star rating. AMI mortality rates only had a slight decline with increased star rating. Surprisingly, HF mortality rates appear to actually increase with higher star ratings.
@@ -735,7 +784,8 @@ combined_data <- mort %>%
 combined_data %>%
   ggplot(aes(H_STAR_RATING, Risk.Adjusted.Mortality.Rate)) +
   geom_boxplot() +
-  ggtitle("Risk Adjusted Mortality vs. Star Rating")
+  ggtitle("Risk Adjusted Mortality vs. Star Rating") +
+  xlab("Star Rating")
 
 ```
 
@@ -749,19 +799,22 @@ cost %>%
   filter(Payment.measure.ID == "PAYM_30_PN") %>%
   ggplot(aes(H_STAR_RATING, Denominator)) +
   geom_boxplot() +
-  ggtitle("Number of Cases of Pneumonia vs Star Rating")
+  ggtitle("Number of Cases of Pneumonia vs Star Rating") +
+  xlab("Star Rating")
 
 cost %>%
   filter(Payment.measure.ID == "PAYM_30_AMI") %>%
   ggplot(aes(H_STAR_RATING, Denominator)) +
   geom_boxplot() +
-  ggtitle("Number of Cases of AMI vs Star Rating")
+  ggtitle("Number of Cases of AMI vs Star Rating") +
+  xlab("Star Rating")
 
 cost %>%
   filter(Payment.measure.ID == "PAYM_30_HF") %>%
   ggplot(aes(H_STAR_RATING, Denominator)) +
   geom_boxplot() +
-  ggtitle("Number of Cases of HF vs Star Rating")
+  ggtitle("Number of Cases of HF vs Star Rating") +
+  xlab("Star Rating")
 
 ```
 
@@ -900,7 +953,8 @@ combined_data <- tmp %>%
 combined_data %>%
   ggplot(aes(H_STAR_RATING, Infections)) +
   geom_boxplot() +
-  ggtitle("Total Hospital Infections vs. Star Rating")
+  ggtitle("Total Hospital Infections vs. Star Rating") +
+  xlab("Star Rating")
 
 ```
 
@@ -911,7 +965,7 @@ It looks like infections from hospitals is slightly lower for the higher 4 star 
 
 From all of the analysis above, it looks like the best candidates for additional predictors of HCAHPS star rating is readmission, time to emergency room, heart attack mortality, and payments for pneumonia.
 
-```{r}
+```{r, fig.height = 8, fig.width = 10, warning=FALSE}
 #create the final dataset
 final_dat <- HCAHPS
 
@@ -1015,3 +1069,36 @@ sd(knnNew_10)
 ```
 
 Our average accuracy is now around 97%. 
+
+Finally, out of curiosity, let's see how well our additional predictors do without the other HCAHPS metrics.
+
+```{r}
+set.seed(1)
+
+final_dat2 <- final_dat %>%
+  select(c(Star_Rating:Payment))
+
+control <- trainControl(method='cv', number=10, p=.8)
+res_knn <- train(Star_Rating ~ .,
+             data = final_dat2,
+             method = "knn",
+             trControl = control,
+             preProcess = c("center","scale"),
+             tuneLength = 1,
+             tuneGrid=data.frame(k=seq(1,5,1)))
+
+res_knn$results %>% 
+  ggplot(aes(k, RMSE, ymin= RMSE - RMSESD, 
+             ymax = RMSE + RMSESD)) +
+  geom_point() + geom_errorbar() +
+  ggtitle("RMSE over k")
+
+res_knn
+
+```
+
+From the RMSE over K results above, we can intuit without further modeling that by themselves the additional non-HCAHPS predictors are not particularly powerful factors in star ratings.
+
+#Conclusion
+
+

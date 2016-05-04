@@ -874,7 +874,7 @@ It looks like infections from hospitals is slightly lower for the higher 4 star 
 
 ##Aggregating the findings
 
-From all of the analysis above, it looks like the best candidates for additional predictors of HCAHPS star rating is readmission, time to emergency room, heart attack mortality, and payments for pneumonia.
+From all of the analysis above, it looks like the best candidates for additional predictors of HCAHPS star rating are readmission, time spent in the emergency room, heart attack mortality, and payments for pneumonia.
 
 ```{r}
 #create the final dataset

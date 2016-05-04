@@ -3,13 +3,14 @@ title: "Create HCAHPS Map"
 output: html_document
 ---
 
-
+This is a separate file to create the US and NYC HCAHPS Star Rating maps. The libraries choroplethr masks the summarise function of dplyr, and so this portion of the code was separated from the main file to avoid issues on that end.
 
 ```{r}
+library(dplyr)
+library(ggplot2)
 library(choroplethr)
 library(choroplethrZip) 
 library(choroplethrMaps)
-library(dplyr)
 
 hcahps <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/hcahps.csv") #national
 
@@ -29,13 +30,17 @@ data(county.regions)
 map_star <- map_star %>%
   left_join(county.regions, by = "county.name") %>%
   select(c(region, value)) %>%
-  group_by(region) %>%
-  summarise(value = mean(value))
+  dplyr::group_by(region) %>%
+  dplyr::summarise(value = mean(value))
 
-county_choropleth(map_star, 
+
+us_map = county_choropleth(map_star, 
                   title = "US HCAHPS Average Star Rating by County", legend = "Average Star Rating")
-
+ggsave(filename="USMap.png",plot=us_map, path = "~/cs107/Hospital-Ranking-CS107")
   
+```
+
+```{r}
 #filter for just NYC
 df_star_zip <- hcahps %>%
   filter(HCAHPS.Measure.ID == "H_STAR_RATING") %>%
@@ -47,18 +52,20 @@ df_star_zip$value <- as.numeric(as.character(df_star_zip$value))
 
 df_star_zip <- df_star_zip %>%
   na.omit() %>%
-  group_by(region) %>%
-  summarise(value = mean(value))
+  dplyr::group_by(region) %>%
+  dplyr::summarise(value = mean(value))
 
 df_star_zip$region <- as.character(df_star_zip$region)
 
 #map the star ratings for NYC
 nycmap = ZipChoropleth$new(df_star_zip)
 nyc_fips = c(36005, 36047, 36061, 36081, 36085)
-zip_choropleth(df_star_zip, 
+ny_map = zip_choropleth(df_star_zip, 
                county_zoom=nyc_fips, 
                title="HCAHPS Star Rating by Zip Code for NYC",
                legend="Star Rating")
+
+ggsave(filename="NYMap.png",plot=ny_map, path = "~/cs107/Hospital-Ranking-CS107")
 
 ```
 

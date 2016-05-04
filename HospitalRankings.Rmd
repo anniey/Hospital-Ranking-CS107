@@ -20,7 +20,6 @@ library(ggplot2)
 library(broom)
 library(knitr)
 library(caret)
-library('corrplot')
 #cost sets
 paymentandvalue <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/Payment_and_value_of_care_-_Hospital.csv") #national
 inpatientcost <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/Hospital_Inpatient_Cost_Transparency__Beginning_2009.csv") #NYS
@@ -282,7 +281,7 @@ Now, let's see if we can build a knn model from these additional HCAHPS metrics.
 ```{r}
 
 set.seed(1)
-control <- trainControl(method='cv', number=10, p=.8)
+control <- trainControl(method='cv', number=10, p=.7)
 
 #we will need to center and scale since we are using different units
 res_knn <- train(Star_Rating ~ .,
@@ -951,7 +950,7 @@ final_dat <- subset(final_dat, select=c(Star_Rating,ER_Wait:Quietness))
 
 heatmap.2(as.matrix(final_dat_dist), 
           margins = c(10,10),
-          cellnote= round(as.matrix(final_dat_dist),4), 
+          cellnote= round(as.matrix(final_dat_dist),3), 
           notecex=1.0,
           notecol="cyan",
           dendrogram = 'none',
@@ -961,6 +960,7 @@ heatmap.2(as.matrix(final_dat_dist),
 
 ```
 
+From the heatmap above, we see that nurse communication and medication communication are still the closet to the star rating. Out of the new predictors we added, mortality rate for heart failures is the closes to star rating.
 
 Now, let's revisit our knn model
 
@@ -984,48 +984,34 @@ res_knn$results %>%
 res_knn
 ```
 
-It looks like the best k value is 3.
+It looks like the best k value is 3. Let's run our prediction model 10 times and see if our average results have improved.
 
 ```{r}
-set.seed(1)
+
 #let's create a model with k = 3
-inTrain <- createDataPartition(y = final_dat$Star_Rating , p = 0.8)
-train_set <- slice(final_dat, inTrain$Resample1)
-test_set <- slice(final_dat, -inTrain$Resample1)
 
-#reset factors for test set
-test_set$Star_Rating  <- factor(test_set$Star_Rating )
-
-#fit the data
-
-pred <- predict(res_knn, newdata = test_set)
-tab <- table(pred = round(pred), truth = test_set$Star_Rating)
-
-confusionMatrix(tab)$overall["Accuracy"]
-
-```
-
-```{r}
-
-knn_10 <- sapply(1:10, function(i){
-  inTrain <- createDataPartition(y = HCAHPS_sum$Star_Rating , p = 0.8)
-  train_set <- slice(HCAHPS_sum, inTrain$Resample1)
-  test_set <- slice(HCAHPS_sum, -inTrain$Resample1)
+knnNew_10 <- sapply(1:10, function(x) {
+  inTrain <- createDataPartition(y = final_dat$Star_Rating , p = 0.8)
+  train_set <- slice(final_dat, inTrain$Resample1)
+  test_set <- slice(final_dat, -inTrain$Resample1)
   
+  #reset factors for test set
   test_set$Star_Rating  <- factor(test_set$Star_Rating )
   
-  pred <- predict(res_knn, newdata = test_set)
+  #fit the data
   
-  #special treatment to catch corner cases where the number of stars in the prediction don't match the number of stars in the truth (i.e. there is a 4 star in the truth but not in the prediction)
+  pred <- predict(res_knn, newdata = test_set)
   
   pred = round(pred)
   truth = test_set$Star_Rating
   u = union(pred, truth)
   tab <- table(factor(pred, u), factor(truth, u))
   
-  confusionMatrix(tab)$overall["Accuracy"] 
+  confusionMatrix(tab)$overall["Accuracy"]
 })
 
-mean(knn_10)
-sd(knn_10)
+mean(knnNew_10)
+sd(knnNew_10)
 ```
+
+Our average accuracy is now around 97%. 

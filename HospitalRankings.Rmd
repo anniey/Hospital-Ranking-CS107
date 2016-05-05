@@ -1107,4 +1107,14 @@ Management of heart attacks is very specialized and benefits from a structured a
 
 Using these measures we were able to acheive over 90# accuracy in predicing HCAPHS scores.
 
+In the wake of the Affordable Care Act the American people expect better quality healthcare at a lower cost. The government encourages hospitals to focus on the patient expirience by publishing HCASPHS scores and tying financial incentives to HCAHPS scores. We thought larger centers would be more cost effective but we found that this is not neccessarily the case. We also expected hospitals with better survival rates to have better HCAPHS scores, but again this was not true. 
+
+Readmission rates were useful in predicting the HCAHPS score. Similarly, according to the heatmap, the score on communication related questions were close to the overall HCAHPS score. These two facts taken together suggest that communication may be important in reducing readmission and improving the patient expirience. Patients who understand how and when to take their medication, for example, are more likely to take it as prescribed and are, therefore, less likely to come back into the hospital. 
+
+Time spent in the emergency room is also an important predictor of star rating. Perhaps a long stay in the emergency department is a symptom of other inefficiencies elsewhere in the hospital. Patients with long stays in the emergency department are likely to be upset and these negative feelings may cast dispursion on the rest of their hospital stay. 
+
+Management of heart attacks is very specialized and benefits from a structured approach, more so than other areas of medicine (such as pneumonia). It's possible that hospitals that can manage heart attacks well are more likely to offer a good patient expirirence.
+
+Using these measures we were able to acheive over 90# accuracy in predicing HCAPHS scores.
+
 

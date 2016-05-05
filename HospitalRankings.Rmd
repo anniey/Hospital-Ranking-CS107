@@ -728,7 +728,7 @@ Interestingly, cost does not appear to have a consistent relationship with star 
 
 What about mortality rates?
 
-```{r}
+```{r, warning = FALSE}
 #select the columns we want relating to mortality
 mort <- complicationshospital %>%
   select(c(Provider.ID, Hospital.Name, Measure.ID, Denominator, Score)) %>%
@@ -775,7 +775,7 @@ Much like cost, mortality does not appear to have a consistent relationship with
 
 How do mortality rates from PCI compare? 
 
-```{r}
+```{r, warning = FALSE}
 #merge mortality info from PCI
 PCIbyhospital <- PCIbyhospital %>%
   left_join(ID_key, by = "Facility.Id")
@@ -800,7 +800,7 @@ Based on the above boxplots, it looks like there is no real difference in mortal
 
 Finally, given that we saw some weak relationship between number of cases seen and mortality, let us take a look at its relationship to star rating.
 
-```{r}
+```{r, warning = FALSE}
 #we will use number of cases seen from the complications table
 cost %>%
   filter(Payment.measure.ID == "PAYM_30_PN") %>%
@@ -1108,24 +1108,14 @@ From the RMSE over K results above, we can intuit without further modeling that 
 
 #Conclusion/Final Analysis
 
-In the wake of the Affordable Care Act the American people expect better quality healthcare at a lower cost. The government encourages hospitals to focus on the patient expirience by publishing HCAHPS scores and tying financial incentives to HCAHPS scores. We thought larger centers would be more cost effective but we found that this is not neccessarily the case. We also expected hospitals with better survival rates to have better HCAPHS scores, but again this was not true. 
+In the wake of the Affordable Care Act the American people expect better quality healthcare at a lower cost. The government encourages hospitals to focus on the patient experience by publishing HCAHPS scores and tying financial incentives to HCAHPS scores. We thought larger centers would be more cost effective but we found that this is not neccessarily the case. We also expected hospitals with better survival rates to have better HCAPHS scores, but again this was not true. 
 
 Readmission rates were useful in predicting the HCAHPS score. Similarly, according to the heatmap, the score on communication related questions were close to the HCAHPS overall star rating. These two facts taken together suggest that communication may be important in reducing readmission and improving the patient expirience. Patients who understand how and when to take their medication, for example, are more likely to take it as prescribed and are, therefore, less likely to come back into the hospital. 
 
 Time spent in the emergency room is also an important predictor of star rating. Perhaps a long stay in the emergency department is a symptom of other inefficiencies elsewhere in the hospital. Patients with long stays in the emergency department are likely to be upset and these negative feelings may cast dispursion on the rest of their hospital stay. 
 
-Management of heart attacks is very specialized and benefits from a structured approach, more so than other areas of medicine (such as pneumonia). It's possible that hospitals that can manage heart attacks well are more likely to offer a good patient expirirence.
+Management of heart attacks is very specialized and benefits from a structured approach, more so than other areas of medicine (such as pneumonia). It is also difficult to treat and unpredictable. This may be one driver for why we saw an increase in mortality rate with higher star ratings. Hospitals that are well equipped to treat heart failure may attract more cases and more severe/complex cases because of that very competency. 
 
-Using these measures we were able to acheive over 90# accuracy in predicing HCAPHS scores.
-
-In the wake of the Affordable Care Act the American people expect better quality healthcare at a lower cost. The government encourages hospitals to focus on the patient expirience by publishing HCASPHS scores and tying financial incentives to HCAHPS scores. We thought larger centers would be more cost effective but we found that this is not neccessarily the case. We also expected hospitals with better survival rates to have better HCAPHS scores, but again this was not true. 
-
-Readmission rates were useful in predicting the HCAHPS score. Similarly, according to the heatmap, the score on communication related questions were close to the overall HCAHPS score. These two facts taken together suggest that communication may be important in reducing readmission and improving the patient expirience. Patients who understand how and when to take their medication, for example, are more likely to take it as prescribed and are, therefore, less likely to come back into the hospital. 
-
-Time spent in the emergency room is also an important predictor of star rating. Perhaps a long stay in the emergency department is a symptom of other inefficiencies elsewhere in the hospital. Patients with long stays in the emergency department are likely to be upset and these negative feelings may cast dispursion on the rest of their hospital stay. 
-
-Management of heart attacks is very specialized and benefits from a structured approach, more so than other areas of medicine (such as pneumonia). It's possible that hospitals that can manage heart attacks well are more likely to offer a good patient expirirence.
-
-Using these measures we were able to acheive over 90# accuracy in predicing HCAPHS scores.
+Using these measures we were able to achieve over 95% accuracy in predicing HCAHPS scores. Interestingly, the non-HCAHPS predictors also had some predictive power, but not to the extent one would expect. It could be that our dataset was too limited and didn't have the right metrics. Perhaps a focus on non-emergency/severe treatments might have produced different results. We also can't be sure if the random population surveyed is representative of the population from which we sourced our other quantitative metrics. It is also possible that, like the article referenced earlier, the relationship between patient satisfaction and actual care received is weak. Our result on increase heart failures at higher rated hospitals may be evidence toward that claim.
 
 

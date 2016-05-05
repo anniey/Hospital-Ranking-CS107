@@ -5,12 +5,35 @@ date: "April 20, 2016"
 output: html_document
 ---
 
+####Overview/Motivation
 The purpose of this project is to examine the Hospital Consumer Assessment of Healthcare Providers and Systems (HCAHPS) and related healthcare quality and patient safety metrics that capture patient's overall experience at a hospital. 
 
 As part of the Affordable Care Act, the government created a national, standardized, publicly reported survey of the patient's expirience by hospital (i.e. the HCAHPS). The HCAHPS contains qualitative measures of a patient's experience including cleanliness of the hospital, pain management, effective communication by doctors and nurses, etc. HCAHPS Scores are based on surveys sent to patients by the Centers for Medicaid and Medicare (CMS).  A random sampling of patients receive surveys from CMS.  The survey responses are controlled for a number of factors including demographics and hospital location. CMS publishes a star rating for each of the survey questions and for an overall score, the highest rating a hospital can get is 5 stars and the lowest is 1 star.The survey questions are primarily centered around patient satisfaction and quality of service in the hospital, such as: how well did your doctor communicate with you? Did the staff explain the medications you were given? Was your pain well managed? Was it quiet?
 
 Our project will create a predictive model of star ratings for NY hospitals. First, we will look at other metrics within HCAHPS that can be leveraged within our model. Then, we will explore other hospital/Medicare databases and see whether metrics such as cost, mortality rates, infection rates, readmission rates, and waiting times are also predictive of star ratings.
 
+The sources of our data can be found below:
+
+HCAHPS: 
+https://data.medicare.gov/Hospital-Compare/Patient-survey-HCAHPS-Hospital/dgck-syfz
+
+Cost-related:
+https://data.medicare.gov/Hospital-Compare/Payment-and-value-of-care-Hospital/c7us-v4mf
+https://health.data.ny.gov/Health/Hospital-Inpatient-Cost-Transparency-Beginning-200/7dtz-qxmr
+
+Complications/Infections:
+https://health.data.ny.gov/Health/Cardiac-Surgery-and-Percutaneous-Coronary-Interven/jtip-2ccj
+https://health.data.ny.gov/Health/Hospital-Acquired-Infections-Beginning-2008/utrt-zdsi
+https://data.medicare.gov/Hospital-Compare/Complications-Hospital/632h-zaca
+https://data.medicare.gov/Hospital-Compare/Hospital-Readmissions-Reduction-Program/9n3s-kdb3
+https://data.medicare.gov/Hospital-Compare/Readmissions-Complications-and-Deaths-Hospital/7xux-kdpw
+
+Service:
+https://data.medicare.gov/Hospital-Compare/Timely-and-Effective-Care-Hospital/yv7e-xc69
+
+
+
+#Data Wrangling
 Load files from github repo:
 ```{r}
 library(broom)
@@ -42,7 +65,6 @@ readmission <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranki
 hospitalinfection <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/Hospital-Acquired_Infections__Beginning_2008.csv") #ny
 ```
 
-#Wrangling
 Our datasets are publically available from either New York State or the federal government. New York State and the federal government have different naming conventions and don't share a common identifier for hospitals. In order to get compary data from the two sources we need to wrangle the data. 
 
 Firstly, let's limit national data sets to New York State only:
@@ -204,7 +226,9 @@ ID_key <- merge(FacilityNames, HospitalNames, by = "Hospital.Name", all = TRUE) 
 
 We now have a key matching facility ID to provider ID for around 130 hospitals. We can use this later when we are looking to investigate the relationship between metrics from the national datasets (eg HCAHPS, readmission) and the New York datasets (eg infection rates, payments)
 
-#Part 1: Examining HCAHPS
+#Part 1 of Data Exploration: Examining HCAHPS
+
+![](https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/USMap.png) ![](https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/NYMap.png)
 
 For HCAHPS, we are only really concerned with the linear score and the star rating. Let's keep only those metrics and spread the measures so that each measure ID is its own column.
 
@@ -357,7 +381,7 @@ We still have an average accuracy of around 90%, with a standard deviation of ar
 
 Now, we will expand our search outside of the HCAHPS and see if metrics from other databases can help us improve our predicitons. Before we link these new metrics to HCAHPS, we will first explore each dataset and examine some additional hypotheses that would impact patient experience.
 
-#Data exploration of other potential predictors
+#Part Two of Data Exploration: Other potential predictors
 
 As we have several other potential predictors in our other datasets, we will limit this preliminary data exploration to just those that have cost and mortality metrics, as we assume that these two are most likely to impact patient experience. Additionally, we will consider the hospital case load. Our hypothesis is that hospitals with higher case loads have more expirience treating a given disease which may translate to better and more efficient treatment that will lower costs and increase survival.
 
@@ -650,7 +674,7 @@ kable(res_Adj)
 
 We see about a similar relationship but at a decreased magnitude of 0.01%-0.04% decrease in mortality rate for each additional case seen.
 
-#Final Model for HCAHPS Star Rating
+#Part 3 of Data Exploration: Final Model for HCAHPS Star Rating
 
 Now that we have explored the other datasets, we will start examining the relationship between these new metrics and HCAHPS star rating to see if we can improve our model.
 
@@ -1071,6 +1095,6 @@ res_knn
 
 From the RMSE over K results above, we can intuit without further modeling that by themselves the additional non-HCAHPS predictors are not particularly powerful factors in star ratings.
 
-#Conclusion
+#Conclusion/Final Analysis
 
 

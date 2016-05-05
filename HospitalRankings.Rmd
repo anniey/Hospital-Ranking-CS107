@@ -1,7 +1,7 @@
 ---
 title: "Hospital Rankings"
 author: "Michael Zelenetz, Xiaojing Yang"
-date: "April 20, 2016"
+date: "May 4, 2016"
 output: html_document
 ---
 
@@ -89,17 +89,20 @@ readmission <- readmission %>% filter(State=="NY")
 
 Additional wrangling of factor to numeric
 ```{r, warning = FALSE}
-
+#change to numeric
 complicationshospital$Denominator <- as.numeric(as.character(complicationshospital$Denominator))
 complicationshospital$Score <- as.numeric(as.character(complicationshospital$Score))
 
+#strip out the special characters and convert to numeric
 inpatientcost$Mean.Charge <- sub('\\$','', as.character(levels(inpatientcost$Mean.Charge))[inpatientcost$Mean.Charge]) %>%
   as.numeric()
+
 inpatientcost$Median.Charge <- sub('\\$','', as.character(levels(inpatientcost$Median.Charge))[inpatientcost$Median.Charge]) %>%
   as.numeric()
 
 paymentandvalue$Payment <- sub('\\$','', as.character(levels(paymentandvalue$Payment))[paymentandvalue$Payment]) %>%
   as.numeric()
+
 paymentandvalue$Denominator <- sub('\\,','', as.character(levels(paymentandvalue$Denominator))[paymentandvalue$Denominator]) %>%
   as.numeric()
 
@@ -329,6 +332,7 @@ res_knn <- train(Star_Rating ~ .,
              tuneLength = 1,
              tuneGrid=data.frame(k=seq(1,15,1)))
 
+#plot the results
 res_knn$results %>% 
   ggplot(aes(k, RMSE, ymin= RMSE - RMSESD, 
              ymax = RMSE + RMSESD)) +
@@ -392,7 +396,7 @@ We still have an average accuracy of around 90%, with a standard deviation of ar
 
 Now, we will expand our search outside of the HCAHPS and see if metrics from other databases can help us improve our predicitons. Before we link these new metrics to HCAHPS, we will first explore each dataset and examine some additional hypotheses that would impact patient experience.
 
-#Part Two of Data Exploration: Other potential predictors
+#Part Two of Data Exploration: Other potential predictors initial data analysis
 
 As we have several other potential predictors in our other datasets, we will limit this preliminary data exploration to just those that have cost and mortality metrics, as we assume that these two are most likely to impact patient experience. Additionally, we will consider the hospital case load. Our hypothesis is that hospitals with higher case loads have more expirience treating a given disease which may translate to better and more efficient treatment that will lower costs and increase survival.
 
@@ -543,6 +547,7 @@ test_set <- slice(PV_HF, -inTrain$Resample1)
 fit <- glm(Care.Cat ~ Denominator, data=train_set)
 pred <- predict(fit, newdata = test_set, type = "response")
 
+#get the confusion matrix
 pred = round(pred)
 truth = test_set$Care.Cat
 u = union(pred, truth)
@@ -571,13 +576,18 @@ test_set <- slice(PV_PN, -inTrain$Resample1)
 #fit the data
 fit <- glm(Care.Cat ~ Denominator, data=train_set)
 pred <- predict(fit, newdata = test_set, type = "response")
-tab <- table(pred = round(pred), truth = test_set$Care.Cat)
 
-tab
+pred = round(pred)
+truth = test_set$Care.Cat
+u = union(pred, truth)
+
+tab <- table(factor(pred, u), factor(truth, u))
+
+confusionMatrix(tab)$overall["Accuracy"]
 
 ```
 
-From the above, we can see that number of cases seen does not have a strong predictive capability for mortality rates for pneumonia. So, the effect we observed for heart failure may just be limited to more complex diseases or diseases that may require more surgical intervention.
+Though slightly less than heart failure, pneumonia is still seeing an effect of number of cases on mortality rates. The accuracy for heart failure may be slightly higher owing to the fact that it is more complex and requires more training and experience than treating pneumonia, which is fairly common place.
 
 Let's see what happens when we leverage another database that has actual mortality rates. We will focus on heart failure for now.
 
@@ -614,7 +624,7 @@ The drop in mortality rate is even more pronounced for AMI.
 Let's see what happens when we try to fit a regression to number of cases and mortality rate of AMI and HF.
 
 ```{r}
-
+#filter and clean NA
 CH_HF <- CH %>%
   filter(Measure.ID == "MORT_30_HF") %>%
   na.omit()
@@ -623,6 +633,7 @@ CH_AMI <- CH %>%
   filter(Measure.ID == "MORT_30_AMI") %>%
   na.omit()
 
+#apply regression
 res_HF <- CH %>%
   filter(Measure.ID %in% c("MORT_30_HF")) %>%
   lm(Score ~ Denominator, data = .) %>%
@@ -670,7 +681,7 @@ PCI_mort %>%
 We see a fairly sharp drop in mortality rate that plateaus once the number of cases surpasses 500. This appears to apply to both the observed and risk adjusted mortality rate. Let's now fit a regression to number of cases against the two rates.
 
 ```{r}
-
+#apply a regression
 res_Obs <- PCI_mort %>%
   lm(Risk.Adjusted.Mortality.Rate ~ Number.of.Cases, data = .) %>%
   tidy(conf.int = TRUE)
@@ -862,6 +873,7 @@ Indeed, there seems to be a trend towards lower 30 readmission rates for hospita
 
 If our theory is, indeed, true then we would expect that patients with lower readmission rates would rate their discharge instructions and communication about medicines highly:
 ```{r, warning = FALSE}
+#visualize the relationship
 readmitHCAHPS %>%
   ggplot(aes(H_COMP_5_LINEAR_SCORE, readmissionRate)) + 
   geom_point() + 
@@ -917,17 +929,21 @@ It appears that as the hospitals with lower HCAHPS star ratings tended to have h
 ##Complications
 
 ```{r}
+#just focus on serious blood clots
 BloodClotScore <- complicationshospital %>% 
   filter(Measure.Name=="Serious blood clots after surgery", rm.na=TRUE)
 
+#class type change
 BloodClotScore$Score <- as.numeric(BloodClotScore$Score)
 BloodClotScore <- BloodClotScore[order(BloodClotScore$Score),]
 
 names(BloodClotScore)[13] <- "Clot.Score"
 
+#add the star rating
 CompsHCAHPS <- left_join(BloodClotScore, HCAHPS, by= "Provider.ID") %>%
   na.omit()
 
+#plot the relationship
 CompsHCAHPS %>%
   ggplot(aes(H_STAR_RATING, Clot.Score)) + 
   geom_boxplot() + 
@@ -944,7 +960,7 @@ HCAHPS star ratings do not appear to have dramatically different rates of seriou
 Finally, to round out our examination of various survival metrics, let us also examine infections.
 
 ```{r, warning = FALSE}
-#merge infection info
+#merge infection info, convert to provider ID using the key
 tmp <- hospitalinfection %>%
   filter(Year == 2014) %>%
   select(Facility.Id, Infections.observed) %>%
@@ -953,11 +969,13 @@ tmp <- hospitalinfection %>%
   left_join(ID_key, by = "Facility.Id") %>%
   na.omit()
 
-combined_data <- tmp %>%
+#add star rating
+infect_star <- tmp %>%
   select(Provider.ID, Infections) %>%
-  right_join(combined_data, by = "Provider.ID")
+  right_join(HCAHPS, by = "Provider.ID")
 
-combined_data %>%
+#plot the relationship
+infect_star %>%
   ggplot(aes(H_STAR_RATING, Infections)) +
   geom_boxplot() +
   ggtitle("Total Hospital Infections vs. Star Rating") +
@@ -976,19 +994,23 @@ From all of the analysis above, it looks like the best candidates for additional
 #create the final dataset
 final_dat <- HCAHPS
 
+#add pneumonia payment
 final_dat <- paymentandvalue %>%
   filter(Payment.measure.ID == "PAYM_30_PN") %>%
   select(Provider.ID, Payment) %>%
   right_join(HCAHPS, by = "Provider.ID")
 
+#add readmission
 final_dat <- readmitHCAHPS %>%
   select(c(Provider.ID, readmissionRate)) %>%
   right_join(final_dat, by = "Provider.ID")
 
+#add heart failure rates
 final_dat <- mort %>%
   select(c(Provider.ID, MORT_30_HF)) %>%
   right_join(final_dat, by = "Provider.ID")
 
+#add ED times
 final_dat <- temp %>%
   select(Provider.ID, Score) %>%
   right_join(final_dat, by = "Provider.ID") %>%
@@ -1009,6 +1031,7 @@ final_dat_dist <- as.matrix(final_dat) %>%
 
 final_dat <- subset(final_dat, select=c(Star_Rating,ER_Wait:Quietness))
 
+#visualize the relationship
 heatmap.2(as.matrix(final_dat_dist), 
           margins = c(10,10),
           cellnote= round(as.matrix(final_dat_dist),3), 
@@ -1027,6 +1050,8 @@ Now, let's revisit our knn model
 
 ```{r}
 set.seed(1)
+
+#model RMSE over k
 control <- trainControl(method='cv', number=10, p=.8)
 res_knn <- train(Star_Rating ~ .,
              data = final_dat,
@@ -1036,6 +1061,7 @@ res_knn <- train(Star_Rating ~ .,
              tuneLength = 1,
              tuneGrid=data.frame(k=seq(1,15,1)))
 
+#graph the results
 res_knn$results %>% 
   ggplot(aes(k, RMSE, ymin= RMSE - RMSESD, 
              ymax = RMSE + RMSESD)) +
@@ -1116,8 +1142,8 @@ HCAHPS metrics surrounding communication were the best predictors of overall HCA
 
 Time spent in the emergency room is also an important predictor of star rating. Perhaps a long stay in the emergency department is a symptom of other inefficiencies elsewhere in the hospital. Patients with long stays in the emergency department are likely to be upset and these negative feelings may cast aspersions on the rest of their hospital stay. 
 
-Management of heart attacks is very specialized and benefits from a structured approach and from advanced diagnostic and treatment modalities, more so than other areas of medicine (such as pneumonia). It is difficult to treat in the hosptial and difficult to manage after discharge, often requiring a large interdisciplinary team. This may be one explination for why we saw an increase in mortality rate with higher star ratings. Hospitals that are well equipped to treat heart failure may attract more cases and more severe/complex cases because of that very competency. 
+Management of heart attacks is very specialized and benefits from a structured approach and from advanced diagnostic and treatment modalities, more so than other areas of medicine (such as pneumonia). It is difficult to treat in the hosptial and difficult to manage after discharge, often requiring a large interdisciplinary team. This may be one explanation for why we saw an increase in mortality rate with higher star ratings. Hospitals that are well equipped to treat heart failure may attract more cases and more severe/complex cases because of that very competency. 
 
-Using these measures we were able to achieve over 95% accuracy in predicing HCAHPS scores. Interestingly, the non-HCAHPS predictors also had some predictive power, but not to the extent one would expect. It could be that our dataset was too limited and didn't have the right metrics. Perhaps a focus on non-emergency/severe treatments might have produced different results. We also can't be sure if the random population surveyed is representative of the population from which we sourced our other quantitative metrics. It is also possible that, like the article referenced earlier, the relationship between patient satisfaction and actual care received is weak. Our result on increase heart failures at higher rated hospitals may be evidence toward that claim.
+Using these measures we were able to achieve over 95% accuracy in predicing HCAHPS scores. Interestingly, the non-HCAHPS predictors also had some predictive power, but not to the extent one would expect. It could be that our dataset was too limited and didn't have the right metrics. Perhaps a focus on non-emergency/severe treatments might have produced different results. We also can't be sure if the random population surveyed is representative of the population from which we sourced our other quantitative metrics. It is also possible that, like the article referenced earlier, the relationship between patient satisfaction and actual care received is weak. Our result on increased heart failures at higher rated hospitals may be evidence toward that claim.
 
 

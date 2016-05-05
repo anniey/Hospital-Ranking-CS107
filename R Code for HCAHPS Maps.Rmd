@@ -16,16 +16,17 @@ hcahps <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS
 
 map_star <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/For%20Map%20only.csv")
 
-#let's show the HCAHPS Star rating by county in US
+
 colnames(map_star) <- c("county.name", "value")
 
 map_star <- map_star %>%
   filter(value != "Not Available", value != "Not Applicable", county.name != "")
 
+#change class and case to match the county.regions data
 map_star$value <- as.numeric(as.character(map_star$value)) 
 map_star$county.name <- tolower(map_star$county.name)
 
-#map the counties to fips
+#map the counties to fips and find the average rating per county
 data(county.regions)
 map_star <- map_star %>%
   left_join(county.regions, by = "county.name") %>%
@@ -33,17 +34,20 @@ map_star <- map_star %>%
   dplyr::group_by(region) %>%
   dplyr::summarise(value = mean(value))
 
-
+#add title and color
 us_map = CountyChoropleth$new(map_star) 
 us_map$title = "US HCAHPS Average Star Rating by County"
 us_map$ggplot_scale = scale_fill_brewer(name="Average Star Rating", palette= "RdYlGn", drop=FALSE)
 
+#save
 ggsave(filename="USMap.png",plot=us_map$render(), path = "~/cs107/Hospital-Ranking-CS107")
   
 ```
 
+NYC Star Rating Map by zip code
+
 ```{r}
-#filter for just NYC
+#filter for just star ratings
 df_star_zip <- hcahps %>%
   filter(HCAHPS.Measure.ID == "H_STAR_RATING") %>%
   select(c(ZIP.Code, Patient.Survey.Star.Rating)) 
@@ -52,6 +56,7 @@ colnames(df_star_zip) <- c("region", "value")
 
 df_star_zip$value <- as.numeric(as.character(df_star_zip$value)) 
 
+#calculate the mean rating
 df_star_zip <- df_star_zip %>%
   na.omit() %>%
   dplyr::group_by(region) %>%

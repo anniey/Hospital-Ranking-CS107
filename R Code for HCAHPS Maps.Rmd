@@ -5,7 +5,7 @@ output: html_document
 
 This is a separate file to create the US and NYC HCAHPS Star Rating maps. The libraries choroplethr masks the summarise function of dplyr, and so this portion of the code was separated from the main file to avoid issues on that end.
 
-```{r}
+```{r, warning = FALSE}
 library(dplyr)
 library(ggplot2)
 library(choroplethr)
@@ -46,7 +46,7 @@ ggsave(filename="USMap.png",plot=us_map$render(), path = "~/cs107/Hospital-Ranki
 
 NYC Star Rating Map by zip code
 
-```{r}
+```{r, warning = FALSE}
 #filter for just star ratings
 df_star_zip <- hcahps %>%
   filter(HCAHPS.Measure.ID == "H_STAR_RATING") %>%

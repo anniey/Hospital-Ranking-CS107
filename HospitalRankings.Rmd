@@ -16,7 +16,7 @@ This project was inspired by this question of the relationship between the HCAHP
 
   * Are larger hospitals more cost effective than smaller ones? Do hospitals that see more cases of a certain disease/disorder, become more efficient and cost effective at treating it?
   
-  * Along the same line, do hospitals that see more cases of a certain disorder have a lower mortality rate as they gain the experience and investment in the equipment to better administer the treatment?
+  * Along the same line, do hospitals that see more cases of a certain disorder have a lower mortality rate as they gain the experience and invest in the equipment to better administer the treatment?
   
   * Out of all of the other metrics used in the HCAHPS, which one is the best predictor for star rating? What does that say about where we should focus on attention in treatment?
   

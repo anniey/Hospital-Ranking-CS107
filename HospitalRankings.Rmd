@@ -8,7 +8,7 @@ output: html_document
 ####Overview/Motivation
 The purpose of this project is to examine the Hospital Consumer Assessment of Healthcare Providers and Systems (HCAHPS) and related healthcare quality and patient safety metrics that capture patient's overall experience at a hospital. 
 
-As part of the Affordable Care Act, the government created a national, standardized, publicly reported survey of the patient's expirience by hospital (i.e. the HCAHPS). The HCAHPS contains qualitative measures of a patient's experience including cleanliness of the hospital, pain management, effective communication by doctors and nurses, etc. HCAHPS Scores are based on surveys sent to patients by the Centers for Medicaid and Medicare (CMS).  A random sampling of patients receive surveys from CMS.  The survey responses are controlled for a number of factors including demographics and hospital location. CMS publishes a star rating for each of the survey questions and for an overall score, the highest rating a hospital can get is 5 stars and the lowest is 1 star.The survey questions are primarily centered around patient satisfaction and quality of service in the hospital, such as: how well did your doctor communicate with you? Did the staff explain the medications you were given? Was your pain well managed? Was it quiet?
+As part of the Affordable Care Act, the government created a national, standardized, publicly reported survey of the patient's experience by hospital (i.e. the HCAHPS). The HCAHPS contains qualitative measures of a patient's experience including cleanliness of the hospital, pain management, effective communication by doctors and nurses, etc. HCAHPS Scores are based on surveys sent to patients by the Centers for Medicaid and Medicare (CMS).  A random sampling of patients receive surveys from CMS.  The survey responses are controlled for a number of factors including demographics and hospital location. CMS publishes a star rating for each of the survey questions and for an overall score, the highest rating a hospital can get is 5 stars and the lowest is 1 star.The survey questions are primarily centered around patient satisfaction and quality of service in the hospital, such as: how well did your doctor communicate with you? Did the staff explain the medications you were given? Was your pain well managed? Was it quiet?
 
 The survey was created not only to help gather data on patient's experiences and help hospitals improve their practices, but will also be used in Medicare reimbursement calculations. As one can imagine, this has led to some [engaged discussions](http://www.theatlantic.com/health/archive/2015/04/the-problem-with-satisfied-patients/390684/) on the value of factoring in patient's perception of care vs. more quantitative measures of care (e.g. survival rates, infection rates, etc). 
 
@@ -76,7 +76,7 @@ readmission <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranki
 hospitalinfection <- read.csv("https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/master/Raw%20Data/Hospital-Acquired_Infections__Beginning_2008.csv") #ny
 ```
 
-Our datasets are publically available from either New York State or the federal government. New York State and the federal government have different naming conventions and don't share a common identifier for hospitals. In order to get compary data from the two sources we need to wrangle the data. 
+Our datasets are publicly available from either New York State or the federal government. New York State and the federal government have different naming conventions and don't share a common identifier for hospitals. In order to get comparable data from the two sources we need to wrangle the data. 
 
 Firstly, let's limit national data sets to New York State only:
 ```{r}
@@ -120,7 +120,7 @@ paymentandvalue$Provider.ID <- as.character(levels(paymentandvalue$Provider.ID))
   as.numeric()
 ```
 
-Becuause there are no common identifiers between national and state data (national uses Provider ID and NY state uses Facility ID), we will have to perform our join using hospital names.
+Because there are no common identifiers between national and state data (national uses Provider ID and NY state uses Facility ID), we will have to perform our join using hospital names.
 
 
 ```{r}
@@ -394,15 +394,15 @@ sd(knn_10)
 
 We still have an average accuracy of around 90%, with a standard deviation of around 4%.
 
-Now, we will expand our search outside of the HCAHPS and see if metrics from other databases can help us improve our predicitons. Before we link these new metrics to HCAHPS, we will first explore each dataset and examine some additional hypotheses that would impact patient experience.
+Now, we will expand our search outside of the HCAHPS and see if metrics from other databases can help us improve our predictions. Before we link these new metrics to HCAHPS, we will first explore each dataset and examine some additional hypotheses that would impact patient experience.
 
 #Part Two of Data Exploration: Other potential predictors initial data analysis
 
-As we have several other potential predictors in our other datasets, we will limit this preliminary data exploration to just those that have cost and mortality metrics, as we assume that these two are most likely to impact patient experience. Additionally, we will consider the hospital case load. Our hypothesis is that hospitals with higher case loads have more expirience treating a given disease which may translate to better and more efficient treatment that will lower costs and increase survival.
+As we have several other potential predictors in our other datasets, we will limit this preliminary data exploration to just those that have cost and mortality metrics, as we assume that these two are most likely to impact patient experience. Additionally, we will consider the hospital case load. Our hypothesis is that hospitals with higher case loads have more experience treating a given disease which may translate to better and more efficient treatment that will lower costs and increase survival.
 
 ##Cost
 
-We will start our cost examination with the inpatientcost dataset. This dataset allows us to look at cost, controlling for the severity of the injury/proceduce. First, let us sanity check this dataset and verify that cost is higher for more severe treatments.
+We will start our cost examination with the inpatientcost dataset. This dataset allows us to look at cost, controlling for the severity of the injury/procedure. First, let us sanity check this dataset and verify that cost is higher for more severe treatments.
 
 ```{r}
 Severity<- inpatientcost %>% 
@@ -431,7 +431,7 @@ Severity %>%
 As expected, it appears extreme cases have higher charges than the other cases. That being said, interestingly enough, there is not much difference in cost between major and minor treatments.
 
 
-Let's see if there is a relationship between dischage and mean cost in this dataset. The idea behind this hypothesis is that hospitals that treat more patients for a certain procedure or disorder may have improved efficiencies that allows them to lower the treatment charge. 
+Let's see if there is a relationship between discharge and mean cost in this dataset. The idea behind this hypothesis is that hospitals that treat more patients for a certain procedure or disorder may have improved efficiency that allows them to lower the treatment charge. 
 
 
 ```{r}
@@ -450,7 +450,7 @@ Severity %>%
 
 ```
 
-Unfortunately, it looks like there is no relationship between number of patients seen and cost of treatment. This suggests that, contrary to expectation, hospitals that see more cases of a certain disorder/disease may not actually have an advantage in scalibility to reduce costs.
+Unfortunately, it looks like there is no relationship between number of patients seen and cost of treatment. This suggests that, contrary to expectation, hospitals that see more cases of a certain disorder/disease may not actually have an advantage in scalability to reduce costs.
 
 
 ##Mortality
@@ -702,7 +702,7 @@ Now that we have explored the other datasets, we will start examining the relati
 
 ##Cost and Mortality
 
-First, we will examine cost. Cost is notoriously nebulous and difficult to understand in healthcare. It is nearly impossible to get a quote on the cost of a procedure before going to the hospital. Often patients never see the bill after going to the hospital. So we wondered what effect, if any, cost would have on patient satisfaction. Are patients less likely to be satisfied with an expensive hospital, or perhaps the care and overall expirience are better at more expensive hospitals and so they are more likely to get high ratings?
+First, we will examine cost. Cost is notoriously nebulous and difficult to understand in healthcare. It is nearly impossible to get a quote on the cost of a procedure before going to the hospital. Often patients never see the bill after going to the hospital. So we wondered what effect, if any, cost would have on patient satisfaction. Are patients less likely to be satisfied with an expensive hospital, or perhaps the care and overall experience are better at more expensive hospitals and so they are more likely to get high ratings?
 
 ```{r, warning= FALSE}
 #add cost metrics
@@ -892,12 +892,12 @@ readmitHCAHPS %>%
 
 ```
 
-There seems to be a downward trend in readmssion rates as the rating of the discharge instructions and medication communication increase.
+There seems to be a downward trend in readmission rates as the rating of the discharge instructions and medication communication increase.
 
 
 ###Time
 
-Time spent in the emergency department is more commonly being looked at as an indicator of the overall patient expirience. We looked at the time it took hospitals to move admitted patients out of the ED to their rooms and compared it with HCAHPS score.
+Time spent in the emergency department is more commonly being looked at as an indicator of the overall patient experience. We looked at the time it took hospitals to move admitted patients out of the ED to their rooms and compared it with HCAHPS score.
 
 ```{r, warning = FALSE}
 #time in ED
@@ -1134,16 +1134,16 @@ From the RMSE over K results above, we can intuit without further modeling that 
 
 #Conclusion/Final Analysis
 
-In the wake of the Affordable Care Act the American people expect better quality healthcare at a lower cost. The government encourages hospitals to focus on the patient experience by publishing HCAHPS scores and tying financial incentives to HCAHPS scores. We thought larger centers would be more cost effective but we found that this is not neccessarily the case. We also expected hospitals with better survival rates to have better HCAPHS scores, but again this was not true. 
+In the wake of the Affordable Care Act the American people expect better quality healthcare at a lower cost. The government encourages hospitals to focus on the patient experience by publishing HCAHPS scores and tying financial incentives to HCAHPS scores. We thought larger centers would be more cost effective but we found that this is not necessarily the case. We also expected hospitals with better survival rates to have better HCAPHS scores, but again this was not true. 
 
-Readmission rates were useful in predicting the HCAHPS score. Similarly, according to the heatmap, the score on communication related questions were close to the HCAHPS overall star rating. These two facts taken together suggest that communication may be important in reducing readmission and improving the patient expirience. Patients who understand how and when to take their medication, for example, are more likely to take it as prescribed and are, therefore, less likely to come back into the hospital. 
+Readmission rates were useful in predicting the HCAHPS score. Similarly, according to the heatmap, the score on communication related questions were close to the HCAHPS overall star rating. These two facts taken together suggest that communication may be important in reducing readmission and improving the patient experience. Patients who understand how and when to take their medication, for example, are more likely to take it as prescribed and are, therefore, less likely to come back into the hospital. 
 
-HCAHPS metrics surrounding communication were the best predictors of overall HCAHPS score. Hosptials looking to improve their HCAHPS scores should start by improving communication between providers and patients. 
+HCAHPS metrics surrounding communication were the best predictors of overall HCAHPS score. Hospitals looking to improve their HCAHPS scores should start by improving communication between providers and patients. 
 
 Time spent in the emergency room is also an important predictor of star rating. Perhaps a long stay in the emergency department is a symptom of other inefficiencies elsewhere in the hospital. Patients with long stays in the emergency department are likely to be upset and these negative feelings may cast aspersions on the rest of their hospital stay. 
 
-Management of heart attacks is very specialized and benefits from a structured approach and from advanced diagnostic and treatment modalities, more so than other areas of medicine (such as pneumonia). It is difficult to treat in the hosptial and difficult to manage after discharge, often requiring a large interdisciplinary team. This may be one explanation for why we saw an increase in mortality rate with higher star ratings. Hospitals that are well equipped to treat heart failure may attract more cases and more severe/complex cases because of that very competency. 
+Management of heart attacks is very specialized and benefits from a structured approach and from advanced diagnostic and treatment modalities, more so than other areas of medicine (such as pneumonia). It is difficult to treat in the hospital and difficult to manage after discharge, often requiring a large interdisciplinary team. This may be one explanation for why we saw an increase in mortality rate with higher star ratings. Hospitals that are well equipped to treat heart failure may attract more cases and more severe/complex cases because of that very competency. 
 
-Using these measures we were able to achieve over 95% accuracy in predicing HCAHPS scores. Interestingly, the non-HCAHPS predictors also had some predictive power, but not to the extent one would expect. It could be that our dataset was too limited and didn't have the right metrics. Perhaps a focus on non-emergency/severe treatments might have produced different results. We also can't be sure if the random population surveyed is representative of the population from which we sourced our other quantitative metrics. It is also possible that, like the article referenced earlier, the relationship between patient satisfaction and actual care received is weak. Our result on increased heart failures at higher rated hospitals may be evidence toward that claim.
+Using these measures we were able to achieve over 95% accuracy in predicting HCAHPS scores. Interestingly, the non-HCAHPS predictors also had some predictive power, but not to the extent one would expect. It could be that our dataset was too limited and didn't have the right metrics. Perhaps a focus on non-emergency/severe treatments might have produced different results. We also can't be sure if the random population surveyed is representative of the population from which we sourced our other quantitative metrics. It is also possible that, like the article referenced earlier, the relationship between patient satisfaction and actual care received is weak. Our result on increased heart failures at higher rated hospitals may be evidence toward that claim.
 
 

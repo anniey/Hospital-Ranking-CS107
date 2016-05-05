@@ -10,7 +10,18 @@ The purpose of this project is to examine the Hospital Consumer Assessment of He
 
 As part of the Affordable Care Act, the government created a national, standardized, publicly reported survey of the patient's expirience by hospital (i.e. the HCAHPS). The HCAHPS contains qualitative measures of a patient's experience including cleanliness of the hospital, pain management, effective communication by doctors and nurses, etc. HCAHPS Scores are based on surveys sent to patients by the Centers for Medicaid and Medicare (CMS).  A random sampling of patients receive surveys from CMS.  The survey responses are controlled for a number of factors including demographics and hospital location. CMS publishes a star rating for each of the survey questions and for an overall score, the highest rating a hospital can get is 5 stars and the lowest is 1 star.The survey questions are primarily centered around patient satisfaction and quality of service in the hospital, such as: how well did your doctor communicate with you? Did the staff explain the medications you were given? Was your pain well managed? Was it quiet?
 
-Our project will create a predictive model of star ratings for NY hospitals. First, we will look at other metrics within HCAHPS that can be leveraged within our model. Then, we will explore other hospital/Medicare databases and see whether metrics such as cost, mortality rates, infection rates, readmission rates, and waiting times are also predictive of star ratings.
+The survey was created not only to help gather data on patient's experiences and help hospitals improve their practices, but will also be used in Medicare reimbursement calculations. As one can imagine, this has led to some [engaged discussions](http://www.theatlantic.com/health/archive/2015/04/the-problem-with-satisfied-patients/390684/) on the value of factoring in patient's perception of care vs. more quantitative measures of care (e.g. survival rates, infection rates, etc). 
+
+This project was inspired by this question of the relationship between the HCAHPS's subjective ratings and other quantitative measures of patient experience. Our approach to the answer is to create a predictive model of star ratings for NY hospitals. First, we will look at other metrics within HCAHPS that can be leveraged within our model. Then, we will explore other hospital/Medicare databases and see whether metrics such as cost, mortality rates, infection rates, readmission rates, and waiting times are also predictive of star ratings. Along the way, we hope to answer some of the following questions:
+
+  * Are larger hospitals more cost effective than smaller ones? Do hospitals that see more cases of a certain disease/disorder, become more efficient and cost effective at treating it?
+  
+  * Along the same line, do hospitals that see more cases of a certain disorder have a lower mortality rate as they gain the experience and investment in the equipment to better administer the treatment?
+  
+  * Out of all of the other metrics used in the HCAHPS, which one is the best predictor for star rating? What does that say about where we should focus on attention in treatment?
+  
+  * Are quantitative measures of patient experience (cost, complications, readmissions, etc) equally good predictors of star ratings as the other measures on the survey.
+
 
 The sources of our data can be found below:
 
@@ -1097,9 +1108,9 @@ From the RMSE over K results above, we can intuit without further modeling that 
 
 #Conclusion/Final Analysis
 
-In the wake of the Affordable Care Act the American people expect better quality healthcare at a lower cost. The government encourages hospitals to focus on the patient expirience by publishing HCASPHS scores and tying financial incentives to HCAHPS scores. We thought larger centers would be more cost effective but we found that this is not neccessarily the case. We also expected hospitals with better survival rates to have better HCAPHS scores, but again this was not true. 
+In the wake of the Affordable Care Act the American people expect better quality healthcare at a lower cost. The government encourages hospitals to focus on the patient expirience by publishing HCAHPS scores and tying financial incentives to HCAHPS scores. We thought larger centers would be more cost effective but we found that this is not neccessarily the case. We also expected hospitals with better survival rates to have better HCAPHS scores, but again this was not true. 
 
-Readmission rates were useful in predicting the HCAHPS score. Similarly, according to the heatmap, the score on communication related questions were close to the overall HCAHPS score. These two facts taken together suggest that communication may be important in reducing readmission and improving the patient expirience. Patients who understand how and when to take their medication, for example, are more likely to take it as prescribed and are, therefore, less likely to come back into the hospital. 
+Readmission rates were useful in predicting the HCAHPS score. Similarly, according to the heatmap, the score on communication related questions were close to the HCAHPS overall star rating. These two facts taken together suggest that communication may be important in reducing readmission and improving the patient expirience. Patients who understand how and when to take their medication, for example, are more likely to take it as prescribed and are, therefore, less likely to come back into the hospital. 
 
 Time spent in the emergency room is also an important predictor of star rating. Perhaps a long stay in the emergency department is a symptom of other inefficiencies elsewhere in the hospital. Patients with long stays in the emergency department are likely to be upset and these negative feelings may cast dispursion on the rest of their hospital stay. 
 

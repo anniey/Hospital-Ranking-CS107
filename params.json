@@ -1,0 +1,6 @@
+{
+  "name": "Hospital Rankings",
+  "tagline": "CS107 Final Project: Michael Zelenetz and Annie Yang",
+  "body": "## Motivation for the Project\r\n\r\nAs part of the Affordable Care Act, the US government created a national, standardized, publicly reported survey of the patient's experience by hospital (i.e. the HCAHPS). The HCAHPS contains qualitative measures of a patient's experience including cleanliness of the hospital, pain management, effective communication by doctors and nurses. One of it's key metrics is the star rating, which reflects an overall rating for the hospital.\r\n\r\nThe goal of this project is to investigate any relationships the HCAHPS star rating may have with other HCAHPS measures and other metrics of patient experience like mortality rate, cost, and re-admission for complications. In doing so, we hope to gain a better understanding of what kind of experience this star rating is actually capturing, especially given that it can be used to increase or decrease the amount of reimbursement a hospital received from Medicare.",
+  "note": "Don't delete this file! It's used internally to help with page regeneration."
+}

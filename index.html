@@ -28,9 +28,11 @@
 
 <p>The goal of this project is to investigate any relationships the HCAHPS star rating may have with other HCAHPS measures and other metrics of patient experience like mortality rate, cost, and re-admission for complications. In doing so, we hope to gain a better understanding of what kind of experience this star rating is actually capturing, especially given that it can be used to increase or decrease the amount of reimbursement a hospital receives from Medicare. We are looking to answer 3 questions in particular:</p>
 
-<p>1) Which of HCAHPS's other metrics is most similar to the star rating?
-2) Does the star rating capture other metrics out there, besides those in HCAHPS?
-3) What should hospitals focus on improving in order to increase their star ratings?</p>
+<ol>
+<li>Which of HCAHPS's other metrics is most similar to the star rating?</li>
+<li>Does the star rating capture other metrics out there, besides those in HCAHPS?</li>
+<li>What should hospitals focus on improving in order to increase their star ratings?</li>
+</ol>
 
 <h2>
 <a id="the-data" class="anchor" href="#the-data" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>The Data</h2>
@@ -56,7 +58,7 @@
 
 <p><img src="https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/gh-pages/images/heatmap2.png" alt="heatmap1"></p>
 
-<p>We visualized the relationship of star ratings to the other HCAHPS metrics using the heat map above, which shows the distance between any two objects. Looking at the star rating column, we can see that the communication of nurses is the metric closest to star ratings, followed by communications on aftercare medication and staff responsiveness. We used these 10 metrics in a k-nearest neighbor model and was able to correctly predict star ratings with a 90% accuracy. Our next step was to see if we could improve our accuracy further with additional patient experience metrics outside of the HCAHPS.</p>
+<p>We visualized the relationship of star ratings to the other HCAHPS metrics using the heat map above, which shows the distance between any two objects. Looking at the star rating column, we can see that the communication of nurses is the metric closest to star ratings, followed by communications on medication and staff responsiveness. We used these 10 metrics in a k-nearest neighbor model and was able to correctly predict star ratings with a 90% accuracy. Our next step was to see if we could improve our accuracy further with additional patient experience metrics outside of the HCAHPS.</p>
 
 <h2>
 <a id="integrating-other-measures-of-patient-experience" class="anchor" href="#integrating-other-measures-of-patient-experience" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Integrating Other Measures of Patient Experience</h2>
@@ -94,14 +96,14 @@
 <h2>
 <a id="final-prediction-model" class="anchor" href="#final-prediction-model" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Final Prediction Model</h2>
 
-<p>We integrated the four relationships we found prior (heart failure rates, pneumonia treatment cost, readmission rates, and ED wait times) in our HCAHPS knn model. The addition increased our accuracy percentage to around 96%, but as we can see by the clear color boundary in the heat map below, the four factors had much weaker relationship to star ratings than the HCAHPS scores. Indeed, using just those four factors to predict star ratings would have probably had an accuracy rating of around 10-20%.</p>
+<p>We integrated the four relationships we found prior (heart failure rates, pneumonia treatment cost, readmission rates, and ED wait times) into our HCAHPS knn model. The addition increased our accuracy percentage to around 96%, but as we can see by the clear color boundary in the heat map below, the four factors had much weaker relationship to star ratings than the HCAHPS scores. Indeed, using just those four factors to predict star ratings would have probably had an accuracy rating of around 10-20%.</p>
 
 <p><img src="https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/gh-pages/images/heatmap.png" alt="map2"></p>
 
 <h2>
 <a id="takeaways" class="anchor" href="#takeaways" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Takeaways</h2>
 
-<p>Returning to our original questions, we found that communications with nurses and communication at discharge was closest in relation to star ratings. Outside of HCAHPS, readmission rates, wait time in ED, heart failure mortality rates, and cost of pneumonia treatment all have a relationship to the star rating. However, these relationships are fairly weak, which suggests both that hospitals should focus on communication training for staff to boost star ratings and that star ratings may not reflect the actual quality of the treatment/care received. </p>
+<p>Returning to our original questions, we found that communications with nurses, staff responsiveness, and communication on medication were closest in relation to star ratings. Outside of HCAHPS, readmission rates, wait time in ED, heart failure mortality rates, and cost of pneumonia treatment all have a relationship to the star rating. However, these relationships are fairly weak, which suggests both that hospitals should focus on communication training for staff to boost star ratings and that star ratings may not reflect the actual quality of the treatment/care received. </p>
 
 <p>That being said, our dataset was fairly limited in scope; it could be that the samples from the various databases we used do not represent the same populations. Future studies should try to directly compare qualitative ratings against quantitative outcomes for the same sample of patients. Other possible investigations include researching whether the effect of communication on star rating increases with the severity of the treatment, regional differences in the US, and the effect of time (ie does taking the HCAHPS survey 6 months post-treatment cause individuals to focus less on qualitative measures as memories of the experience fades).</p>
 

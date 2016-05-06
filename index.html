@@ -71,22 +71,42 @@
 <li>Wait times at emergency departments</li>
 </ul>
 
-<p>When we examined the relationship of these metrics against star ratings, we saw a wide varied of results that can be bucketed into three broad categories:</p>
+<p>Interestingly, neither cost, mortality, nor complications had particularly strong relationships with star rating. We did find though that payment for pneumonia was lower at hospitals with high star ratings:
+    <img src="https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/gh-pages/images/pneumonia.png" alt="PN"></p>
 
-<p>*<strong><em>The Intuitive Findings</em></strong>*:
-    <img src="https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/gh-pages/images/readmission.png" alt="READ"></p>
+<p>We also found that, counter to intuition, rate of heart failure was higher at hospitals with higher ratings:</p>
 
-<p>*<strong><em>The Non-Intuitive Findings</em></strong>*
-    <img src="https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/gh-pages/images/riskmort.png" alt="risk"></p>
+<pre><code>![HF](https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/gh-pages/images/HF.png)
+</code></pre>
 
-<p>*<strong><em>The Contrarian Findings</em></strong>*
-    <img src="https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/gh-pages/images/HF.png" alt="HF"></p>
+<p>This could be because treating heart failure requires extensive equipment and training, which tends to be associated with better quality hospitals.</p>
+
+<p>Our remaining findings were more in-line with expectations. Hospitals that had higher star ratings has also shorter wait times for the emergency department and lower readmission rates:</p>
+
+<pre><code>![READ](https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/gh-pages/images/readmission.png)
+![ED](https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/gh-pages/images/download%20(6).png)
+</code></pre>
+
+<p>We took a closer look at readmission rates and found that it also appears to be correlated with discharge communication and communication on aftercare medication. Hospitals that had lower readmission rate tended to have better scores on both of those HCAHPS measures:</p>
+
+<pre><code>![medication](https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/gh-pages/images/download.png)
+![discharge](https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/gh-pages/images/download%20(5).png)
+</code></pre>
+
+<p>This indicates that readmission rates reflect to a certain extent the communication skills of hospital staff members. Patients who receive better communications on post-treatment followups are much less likely to run into problems and be readmitted later on. Similarly, although we did not investigate this relationship, one could also presume that hospitals with shorter wait times in the ED probably have more responsive staff (another HCAHPS measure highly correlated with star ratings).</p>
 
 <h2>
 <a id="final-prediction-model" class="anchor" href="#final-prediction-model" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Final Prediction Model</h2>
 
+<p>We integrated the four relationships we found prior (heart failure rates, pneumonia treatment cost, readmission rates, and ED wait times) in our HCAHPS knn model. The addition increased our accuracy percentage to around 96%, but as we can see by the clear color boundary in the heat map below, the four factors had much weaker relationship to star ratings than the HCAHPS scores. Indeed, using just those four factors to predict star ratings would have probably had an accuracy rating of around 10-20%.</p>
+
+<pre><code>![medication](https://raw.githubusercontent.com/anniey/Hospital-Ranking-CS107/gh-pages/images/heatmap2.png)
+</code></pre>
+
 <h2>
 <a id="takeaways" class="anchor" href="#takeaways" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Takeaways</h2>
+
+<p>Returning to our</p>
 
       <footer class="site-footer">
         <span class="site-footer-owner"><a href="https://github.com/anniey/Hospital-Ranking-CS107">Hospital Rankings</a> is maintained by <a href="https://github.com/anniey">anniey</a>.</span>
